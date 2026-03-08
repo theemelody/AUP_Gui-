@@ -1,9 +1,44 @@
 import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+import requests
 import streamlit as st
+
+# ---- LLM backend helpers ----
+
+def _openai_available():
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+def _ollama_available(base_url="http://localhost:11434"):
+    try:
+        r = requests.get(f"{base_url}/api/tags", timeout=2)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+def _get_openai_client():
+    from openai import OpenAI
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def ask_openai(messages, model="gpt-4.1-mini"):
+    client = _get_openai_client()
+    response = client.chat.completions.create(model=model, messages=messages)
+    return response.choices[0].message.content
+
+def ask_ollama(messages, model="llama3.1:8b", base_url="http://localhost:11434"):
+    payload = {"model": model, "messages": messages, "stream": False}
+    r = requests.post(f"{base_url}/api/chat", json=payload, timeout=120)
+    r.raise_for_status()
+    return r.json()["message"]["content"]
+
+def ask_llm(messages):
+    backend = st.session_state.get("llm_backend", "auto")
+    if backend == "OpenAI" or (backend == "auto" and _openai_available()):
+        return ask_openai(messages)
+    elif backend == "Ollama (local)" or (backend == "auto" and _ollama_available()):
+        ollama_model = st.session_state.get("ollama_model", "llama3.1:8b")
+        return ask_ollama(messages, model=ollama_model)
+    else:
+        return "⚠️ No LLM backend available. Set OPENAI_API_KEY or start Ollama (`ollama serve`)."
+
 import geopandas as gpd
 import folium
 from folium.plugins import Draw
@@ -11,6 +46,46 @@ from streamlit_folium import st_folium
 from shapely.geometry import shape
 
 st.set_page_config(layout="wide")
+
+# ---------- SIDEBAR: LLM BACKEND ----------
+with st.sidebar:
+    st.header("LLM Settings")
+    _has_openai = _openai_available()
+    _has_ollama = _ollama_available()
+
+    _available = []
+    if _has_openai:
+        _available.append("OpenAI")
+    if _has_ollama:
+        _available.append("Ollama (local)")
+    _available.append("auto")
+
+    _default_backend = "OpenAI" if _has_openai else ("Ollama (local)" if _has_ollama else "auto")
+    st.session_state["llm_backend"] = st.selectbox(
+        "Backend",
+        _available,
+        index=_available.index(_default_backend),
+        help="OpenAI requires OPENAI_API_KEY. Ollama requires `ollama serve` running locally."
+    )
+
+    if st.session_state["llm_backend"] == "Ollama (local)":
+        st.session_state["ollama_model"] = st.text_input(
+            "Ollama model", value="llama3.1:8b"
+        )
+
+    if not _has_openai and not _has_ollama:
+        st.warning("No LLM backend detected. Set OPENAI_API_KEY or run `ollama serve`.")
+    else:
+        _status = []
+        if _has_openai:
+            _status.append("✅ OpenAI")
+        else:
+            _status.append("❌ OpenAI (no key)")
+        if _has_ollama:
+            _status.append("✅ Ollama")
+        else:
+            _status.append("❌ Ollama (not running)")
+        st.caption("  \n".join(_status))
 
 # ---------- CSS ----------
 st.markdown(
@@ -46,13 +121,6 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [
         {"role": "bot", "content": "Ask me anything about urban design..."}
     ]
-
-def ask_openai(messages):
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages
-    )
-    return response.choices[0].message.content
 
 # ---------- DATA LOADING ----------
 @st.cache_data(show_spinner=False)
@@ -144,18 +212,18 @@ with col1:
                 {"role": "user", "content": user_input}
             )
 
-            # sending to openai
-            openai_messages = [
+            # build message history for LLM
+            llm_messages = [
                 {"role": "system", "content": "You are an urban planning assistant."}
             ]
 
             for msg in st.session_state.chat_messages:
-                openai_messages.append(
+                llm_messages.append(
                     {"role": msg["role"], "content": msg["content"]}
                 )
 
-            # OpenAI answer
-            bot_reply = ask_openai(openai_messages)
+            # get reply from active backend
+            bot_reply = ask_llm(llm_messages)
 
             # saving the answer
             st.session_state.chat_messages.append(
