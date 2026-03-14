@@ -28,6 +28,7 @@ numpy==2.2.6
 openai==2.15.0
 packaging==25.0
 pandas==2.3.3
+plotly==6.6.0
 pillow==12.1.0
 protobuf==6.33.4
 pyarrow==23.0.0
