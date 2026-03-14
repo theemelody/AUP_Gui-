@@ -53,6 +53,14 @@ from shapely.geometry import shape
 import charts_plotly as cp
 
 
+_APP_DIR = Path(__file__).resolve().parent
+_AUP_ROOT = _APP_DIR.parent
+_PROJECT_ROOT = _AUP_ROOT.parent
+_SCENARIOS_DIR = _PROJECT_ROOT / "scenarios"
+_DEFAULT_SCENARIO_PATH = _SCENARIOS_DIR / "output-scenario"
+_DEFAULT_CEA_DB_PATH = _PROJECT_ROOT / "CityEnergyAnalyst" / "cea" / "databases" / "DE"
+
+
 def prepare_scenario(scenario_path: Path, zone_gdf):
     """Create CEA scenario folder structure and write zone/site shapefiles."""
     for subdir in ["building-geometry", "building-properties", "topography", "weather"]:
@@ -200,8 +208,6 @@ with st.sidebar:
 
     st.divider()
     st.header("Simulation Settings")
-    _workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _scenarios_root = os.path.join(_workspace_root, "scenarios")
     # Initialise session state keys
     if "scenario_name_confirmed" not in st.session_state:
         st.session_state.scenario_name_confirmed = False
@@ -211,14 +217,14 @@ with st.sidebar:
         "CEA databases path",
         value=st.session_state.get(
             "cea_db_path",
-            os.path.join(_workspace_root, "CityEnergyAnalyst", "cea", "databases", "DE")
+            str(_DEFAULT_CEA_DB_PATH)
         )
     )
 
     st.divider()
     st.subheader("Saved Scenarios")
 
-    _scenarios_dir = Path(_workspace_root) / "scenarios"
+    _scenarios_dir = _SCENARIOS_DIR
     _saved = sorted(
         [d for d in _scenarios_dir.iterdir() if d.is_dir()],
         key=lambda d: d.stat().st_mtime,
@@ -265,11 +271,11 @@ with st.sidebar:
     if _save_pressed and _scenario_input.strip():
         _raw = _scenario_input.strip()
         _folder = f"{_raw}-scenario"
-        _full_path = os.path.join(os.path.join(_workspace_root, "scenarios"), _folder)
+        _full_path = _SCENARIOS_DIR / _folder
         st.session_state["_scenario_raw_name"] = _raw
-        st.session_state.sim_scenario_path = _full_path
+        st.session_state.sim_scenario_path = str(_full_path)
         st.session_state.scenario_name_confirmed = True
-        st.session_state["_scenario_overwrite"] = os.path.exists(_full_path)
+        st.session_state["_scenario_overwrite"] = _full_path.exists()
     elif _save_pressed:
         st.warning("Please enter a scenario name before saving.")
 
@@ -284,7 +290,7 @@ with st.sidebar:
 
     if st.button("🚀 Run Simulation", width="stretch",
                  disabled=(_sb_sel.empty or not _sb_confirmed), key="sb_run"):
-        _run_path = Path(st.session_state.get("sim_scenario_path", "output-scenario"))
+        _run_path = Path(st.session_state.get("sim_scenario_path", str(_DEFAULT_SCENARIO_PATH)))
         _db_path  = st.session_state.get("cea_db_path", "")
         _run_gdf  = st.session_state.get("_selected_gdf", gpd.GeoDataFrame())
 
@@ -402,12 +408,24 @@ if "chat_messages" not in st.session_state:
     ]
 
 # ---------- DATA LOADING ----------
-_SCENARIO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "munich-scenario")
-_ZONE_SHP = os.path.join(_SCENARIO_DIR, "inputs", "building-geometry", "zone.shp")
+def _resolve_zone_shp() -> Path:
+    candidates = [
+        _PROJECT_ROOT / "munich-scenario" / "inputs" / "building-geometry" / "zone.shp",
+        _PROJECT_ROOT / "scenarios" / "munich-commercial-scenario" / "inputs" / "building-geometry" / "zone.shp",
+        _PROJECT_ROOT / "reference-case-open" / "baseline" / "inputs" / "building-geometry" / "zone.shp",
+        _AUP_ROOT / "data" / "OneNeighborhood.shp",
+    ]
+
+    for path in candidates:
+        if path.exists():
+            return path
+
+    checked = "\n".join(f"- {p}" for p in candidates)
+    raise FileNotFoundError(f"No scenario geometry file found. Checked:\n{checked}")
 
 @st.cache_data(show_spinner=False)
 def load_data():
-    gdf = gpd.read_file(_ZONE_SHP)
+    gdf = gpd.read_file(str(_resolve_zone_shp()))
     return gdf.to_crs(epsg=4326)
 
 gdf = load_data()
