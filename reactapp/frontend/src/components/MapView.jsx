@@ -9,7 +9,7 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 
 import { selectBuildings } from "../services/api.js";
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 /** Returns bounds [[minLng, minLat], [maxLng, maxLat]] from GeoJSON. */
 function getBoundsFromGeoJSON(geojson) {

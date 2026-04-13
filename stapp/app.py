@@ -560,19 +560,22 @@ st.session_state["_selected_gdf"] = selected_gdf
 # ---------- RIGHT PANEL ----------
 with col3:
     st.subheader("Listed documents")
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-
     _sel = st.session_state.get("_selected_gdf", selected_gdf)
-    if not _sel.empty:
-        st.success(f"✅ {len(_sel)} building(s) selected.")
-        st.dataframe(
-            _sel.drop(columns="geometry"),
-            width='stretch'
-        )
-    else:
-        st.info("Use the tools to select a site on the map")
-
-    st.markdown('</div>', unsafe_allow_html=True)
+    _selected_count = len(_sel) if not _sel.empty else 0
+    with st.expander(f"Selected buildings ({_selected_count})", expanded=True):
+        if not _sel.empty:
+            st.dataframe(
+                _sel.drop(columns="geometry"),
+                width='stretch'
+            )
+        else:
+            st.info("Use the tools to select a site on the map")
+    with st.expander("Ranked technologies", expanded=True):
+        """
+        This selection will contain a list of mongodb documents with the selected energy production tehcnologies that better fit the scenario.
+        the documents will be ranked from top to bottom, being the top one the best fit for the scenario.
+        the documents will be retrieved from the db by the llm, which will use the information of the selected buildings to query the db and retrieve the best ranked technologies for the scenario.
+        """
 
 # ============================================================
 # CHARTS TAB

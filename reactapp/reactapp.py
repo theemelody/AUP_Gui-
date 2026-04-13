@@ -9,6 +9,8 @@ import os
 from io import BytesIO
 import base64
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
