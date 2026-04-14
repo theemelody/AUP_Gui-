@@ -11,6 +11,18 @@ import { selectBuildings } from "../services/api.js";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
+function normalizeGeoJSON(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value;
+}
+
 /** Returns bounds [[minLng, minLat], [maxLng, maxLat]] from GeoJSON. */
 function getBoundsFromGeoJSON(geojson) {
   if (!geojson) return null;
@@ -102,7 +114,14 @@ function MapView({ buildingsGeoJSON, selectedGeoJSON, onSelection }) {
     bearing: -20
   });
 
-  const geojson = useMemo(() => buildingsGeoJSON || null, [buildingsGeoJSON]);
+  const geojson = useMemo(
+    () => normalizeGeoJSON(buildingsGeoJSON),
+    [buildingsGeoJSON]
+  );
+  const normalizedSelectedGeoJSON = useMemo(
+    () => normalizeGeoJSON(selectedGeoJSON),
+    [selectedGeoJSON]
+  );
   const hasFittedRef = useRef(false);
   const drawRef = useRef(null);
   const selectAbortRef = useRef(null);
@@ -231,8 +250,11 @@ function MapView({ buildingsGeoJSON, selectedGeoJSON, onSelection }) {
 
     const handleChange = () => {
       const fc = draw.getAll();
-      const feature = fc?.features?.[0];
-      fireSelection(feature?.geometry || null);
+      if (!fc?.features?.length) {
+        fireSelection(null);
+        return;
+      }
+      fireSelection(fc);
     };
 
     map.on("draw.create", handleChange);
@@ -274,8 +296,8 @@ function MapView({ buildingsGeoJSON, selectedGeoJSON, onSelection }) {
           </Source>
         )}
 
-        {selectedGeoJSON && (
-          <Source id="selected-buildings" type="geojson" data={selectedGeoJSON}>
+        {normalizedSelectedGeoJSON && (
+          <Source id="selected-buildings" type="geojson" data={normalizedSelectedGeoJSON}>
             <Layer {...selectedFillLayer} />
             <Layer {...selectedOutlineLayer} />
           </Source>

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import geopandas as gpd
 from shapely.geometry import shape
+from shapely.ops import unary_union
 import zipfile
 import tempfile
 import os
@@ -107,7 +108,28 @@ def select_buildings(req: SelectRequest):
     - shapefile ZIP encoded as base64.
     """
     try:
-        drawn_geom = shape(req.geometry)
+        geo = req.geometry
+        geo_type = geo.get("type") if isinstance(geo, dict) else None
+
+        if geo_type == "FeatureCollection":
+            feature_geoms = [
+                shape(feature.get("geometry"))
+                for feature in geo.get("features", [])
+                if isinstance(feature, dict) and feature.get("geometry")
+            ]
+            if not feature_geoms:
+                return {
+                    "count": 0,
+                    "buildings": [],
+                    "selected_geojson": None,
+                    "zip_base64": None,
+                }
+            drawn_geom = unary_union(feature_geoms)
+        elif geo_type == "Feature":
+            drawn_geom = shape(geo.get("geometry"))
+        else:
+            drawn_geom = shape(geo)
+
         selected = gdf[gdf.intersects(drawn_geom)]
 
         # Empty selection
