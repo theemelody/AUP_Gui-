@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@turf/boolean-intersects": "^7.3.4",
     "@turf/turf": "^7.3.4",
     "@types/geojson": "^7946.0.16",
     "mapbox-gl": "^3.7.0",

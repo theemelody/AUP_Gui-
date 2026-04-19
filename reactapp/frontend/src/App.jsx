@@ -1,6 +1,91 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MapView from "./components/MapView.jsx";
-import { fetchBuildings, sendChatMessage } from "./services/api.js";
+import LeftDock from "./components/LeftDock.jsx";
+import ChatPanel from "./components/ChatPanel.jsx";
+import SelectionPanel from "./components/SelectionPanel.jsx";
+import RightPanel from "./components/RightPanel.jsx";
+import {
+  fetchBuildings,
+  fetchConstructionTypeMapping,
+  sendChatMessage
+} from "./services/api.js";
+
+const USE_MAPBOX_BUILDINGS =
+  (import.meta.env.VITE_USE_MAPBOX_BUILDINGS || "true") === "true";
+
+const INITIAL_SELECTION = {
+  count: 0,
+  selectedGeoJSON: null,
+  zipBase64: null,
+  buildings: [],
+  selectionError: null
+};
+
+const INITIAL_CONSTRUCTION_AREA_SELECTION = {
+  count: 0,
+  selectedGeoJSON: null,
+  buildings: [],
+  buildingKeys: [],
+  selectionError: null
+};
+
+function parseSelectedGeoJSON(value) {
+  if (!value) return null;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getFeatureStableKey(feature, index = 0) {
+  const props = feature?.properties || {};
+  const explicitKey = props.__selection_key;
+  if (explicitKey) return String(explicitKey);
+
+  const candidates = [
+    feature?.id,
+    props.id,
+    props.osm_id,
+    props.osm_way_id,
+    props.mapbox_id
+  ];
+
+  for (const value of candidates) {
+    if (value !== null && value !== undefined && value !== "") {
+      return String(value);
+    }
+  }
+
+  return `geom-${index}-${JSON.stringify(feature?.geometry || {})}`;
+}
+
+function findBestConstructionRow(rows, useType, refurbishmentType, detail, yearStart, yearEnd) {
+  const candidates = rows.filter(
+    (row) =>
+      row?.cea_use_type1 === useType &&
+      row?.refurbishment_type === refurbishmentType &&
+      row?.detail === detail
+  );
+  if (!candidates.length) return null;
+
+  const inclusive = candidates.find(
+    (row) => row.year_start <= yearStart && row.year_end >= yearEnd
+  );
+  if (inclusive) return inclusive;
+
+  const overlapped = candidates
+    .filter((row) => row.year_end >= yearStart && row.year_start <= yearEnd)
+    .sort((a, b) => {
+      const overlapA = Math.max(0, Math.min(a.year_end, yearEnd) - Math.max(a.year_start, yearStart));
+      const overlapB = Math.max(0, Math.min(b.year_end, yearEnd) - Math.max(b.year_start, yearStart));
+      return overlapB - overlapA;
+    });
+
+  if (overlapped.length) return overlapped[0];
+  return candidates[0];
+}
 
 function App() {
   const [buildingsGeoJSON, setBuildingsGeoJSON] = useState(null);
@@ -21,52 +106,101 @@ function App() {
   const [savedScenarios, setSavedScenarios] = useState([
     "munich-commercial-scenario"
   ]);
-  const [selection, setSelection] = useState({
-    count: 0,
-    selectedGeoJSON: null,
-    zipBase64: null,
-    buildings: [],
-    selectionError: null
-  });
-
-  const downloadUrl = useMemo(() => {
-    if (!selection.zipBase64) return null;
-    try {
-      const binary = atob(selection.zipBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: "application/zip" });
-      return URL.createObjectURL(blob);
-    } catch {
-      return null;
-    }
-  }, [selection.zipBase64]);
-
-  useEffect(() => {
-    if (!downloadUrl) return;
-    return () => URL.revokeObjectURL(downloadUrl);
-  }, [downloadUrl]);
+  const [selection, setSelection] = useState(INITIAL_SELECTION);
+  const [confirmedSelection, setConfirmedSelection] = useState(null);
+  const [constructionMappingRows, setConstructionMappingRows] = useState([]);
+  const [constructionMappingError, setConstructionMappingError] = useState(null);
+  const [constructionAreaSelection, setConstructionAreaSelection] = useState(
+    INITIAL_CONSTRUCTION_AREA_SELECTION
+  );
+  const [buildingAssignments, setBuildingAssignments] = useState({});
 
   const handleSelection = useCallback((result) => {
+    // Normalize backend and frontend selection payloads into one app state shape.
     setSelection({
       count: result?.count || 0,
-      selectedGeoJSON: result?.selected_geojson
-        ? typeof result.selected_geojson === "string"
-          ? JSON.parse(result.selected_geojson)
-          : result.selected_geojson
-        : null,
+      selectedGeoJSON: parseSelectedGeoJSON(result?.selected_geojson),
       zipBase64: result?.zip_base64 || null,
       buildings: Array.isArray(result?.buildings) ? result.buildings : [],
       selectionError: result?.selection_error || null
     });
   }, []);
 
+  const handleConfirmSelection = useCallback(() => {
+    // Lock the current map-based selection as the confirmed one.
+    if (!selection.count || !selection.selectedGeoJSON) return;
+    setConfirmedSelection(selection);
+    setConstructionAreaSelection(INITIAL_CONSTRUCTION_AREA_SELECTION);
+    setBuildingAssignments({});
+  }, [selection]);
+
+  const handleResetSelection = useCallback(() => {
+    // Return to drawing mode and clear all selection state.
+    setConfirmedSelection(null);
+    setSelection(INITIAL_SELECTION);
+    setConstructionAreaSelection(INITIAL_CONSTRUCTION_AREA_SELECTION);
+    setBuildingAssignments({});
+  }, []);
+
+  const handleConstructionAreaSelection = useCallback((result) => {
+    setConstructionAreaSelection({
+      count: result?.count || 0,
+      selectedGeoJSON: parseSelectedGeoJSON(result?.selected_geojson),
+      buildings: Array.isArray(result?.buildings) ? result.buildings : [],
+      buildingKeys: Array.isArray(result?.building_keys) ? result.building_keys : [],
+      selectionError: result?.selection_error || null
+    });
+  }, []);
+
+  const handleConfirmConstructionFeatures = useCallback(
+    ({ yearStart, yearEnd, useTypeSelections }) => {
+      if (!Array.isArray(constructionAreaSelection.buildingKeys) || !constructionAreaSelection.buildingKeys.length) {
+        return;
+      }
+
+      const nextAssignments = {};
+      constructionAreaSelection.buildingKeys.forEach((key, index) => {
+        const building = constructionAreaSelection.buildings[index] || {};
+        const useType = String(building.cea_use_type1 || "").toUpperCase();
+        const selected = useTypeSelections?.[useType];
+        if (!useType || !selected?.refurbishment_type || !selected?.detail) return;
+
+        const row = findBestConstructionRow(
+          constructionMappingRows,
+          useType,
+          selected.refurbishment_type,
+          selected.detail,
+          yearStart,
+          yearEnd
+        );
+        if (!row) return;
+
+        nextAssignments[key] = {
+          const_type: row.const_type,
+          year_start: yearStart,
+          year_end: yearEnd,
+          refurbishment_type: selected.refurbishment_type,
+          detail: selected.detail,
+          cea_use_type1: useType
+        };
+      });
+
+      if (!Object.keys(nextAssignments).length) return;
+
+      setBuildingAssignments((prev) => ({ ...prev, ...nextAssignments }));
+      setConstructionAreaSelection(INITIAL_CONSTRUCTION_AREA_SELECTION);
+    },
+    [constructionAreaSelection, constructionMappingRows]
+  );
+
   const runSimulation = useCallback(() => {
-    if (!selection.selectedGeoJSON || selection.count <= 0) return;
+    // Run against confirmed selection when present, otherwise current draft selection.
+    const targetSelection = confirmedSelection || selection;
+    if (!targetSelection.selectedGeoJSON || targetSelection.count <= 0) return;
     // Placeholder: simulation endpoint / workflow can be wired here.
     // For now, just confirm the action happened.
-    alert(`Run simulation: ${selection.count} selected building(s)`);
-  }, [selection.count, selection.selectedGeoJSON]);
+    alert(`Run simulation: ${targetSelection.count} selected building(s)`);
+  }, [confirmedSelection, selection]);
 
   const handleSendChat = useCallback(async () => {
     const message = chatInput.trim();
@@ -99,6 +233,8 @@ function App() {
   }, [scenarioName]);
 
   useEffect(() => {
+    // In SHP mode, preload all buildings from the backend once.
+    if (USE_MAPBOX_BUILDINGS) return;
     let cancelled = false;
     async function load() {
       try {
@@ -115,6 +251,92 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    // Load construction decomposition mapping once for construction-phase options.
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await fetchConstructionTypeMapping();
+        if (!cancelled) {
+          const normalizedRows = Array.isArray(rows) ? rows : [];
+          setConstructionMappingRows(normalizedRows);
+          setConstructionMappingError(
+            normalizedRows.length
+              ? null
+              : "Construction mapping is empty. Check CSV headers/content."
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setConstructionMappingRows([]);
+          setConstructionMappingError(
+            e?.message || "Failed to load construction type mapping"
+          );
+        }
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const confirmedFeatureCollection = parseSelectedGeoJSON(
+    confirmedSelection?.selectedGeoJSON
+  );
+
+  const lockedSelectionGeoJSONWithState = (() => {
+    if (!confirmedFeatureCollection?.features?.length) return null;
+    const total = confirmedFeatureCollection.features.length;
+    const assignedCount = confirmedFeatureCollection.features.reduce((acc, feature, index) => {
+      const key = getFeatureStableKey(feature, index);
+      return acc + (buildingAssignments[key] ? 1 : 0);
+    }, 0);
+    const allAssigned = total > 0 && assignedCount === total;
+
+    return {
+      type: "FeatureCollection",
+      features: confirmedFeatureCollection.features.map((feature, index) => {
+        const key = getFeatureStableKey(feature, index);
+        const assignment = buildingAssignments[key] || null;
+        const assignmentState = allAssigned ? "complete" : assignment ? "defined" : "pending";
+        return {
+          ...feature,
+          properties: {
+            ...(feature?.properties || {}),
+            __selection_key: key,
+            __assignment_state: assignmentState,
+            const_type: assignment?.const_type || null,
+            refurbishment_type: assignment?.refurbishment_type || null,
+            detail: assignment?.detail || null,
+            feature_year_start: assignment?.year_start || null,
+            feature_year_end: assignment?.year_end || null
+          }
+        };
+      })
+    };
+  })();
+
+  const confirmedBuildingsWithAssignments =
+    lockedSelectionGeoJSONWithState?.features?.map((feature) => feature.properties) || [];
+
+  const definedBuildingCount = confirmedBuildingsWithAssignments.filter(
+    (props) => props?.const_type
+  ).length;
+  const allConstructionDefined =
+    confirmedBuildingsWithAssignments.length > 0 &&
+    definedBuildingCount === confirmedBuildingsWithAssignments.length;
+
+  const activeSelection = confirmedSelection
+    ? {
+        ...confirmedSelection,
+        count: confirmedBuildingsWithAssignments.length,
+        buildings: confirmedBuildingsWithAssignments,
+        selectedGeoJSON: lockedSelectionGeoJSONWithState
+      }
+    : selection;
+  const hasSelection = activeSelection.count > 0 && Boolean(activeSelection.selectedGeoJSON);
+
   return (
     <div
       className={[
@@ -126,83 +348,16 @@ function App() {
         .filter(Boolean)
         .join(" ")}
     >
-      <aside className={["left-dock", sidebarHidden ? "is-hidden" : ""].filter(Boolean).join(" ")}>
-        <div className="left-dock-header">
-          <div className="left-dock-title">Simulation Workspace</div>
-          <button
-            type="button"
-            className="left-dock-toggle"
-            aria-label="Hide sidebar"
-            onClick={() => setSidebarHidden(true)}
-          >
-            ◀
-          </button>
-        </div>
-
-        <div className="left-dock-section">
-          <div className="left-dock-section-title">Model</div>
-          <div className="left-dock-field">llama3.1:8b</div>
-          <div className="left-dock-status-row">
-            <span className="status-dot status-off" />
-            OpenAI (no key)
-          </div>
-          <div className="left-dock-status-row">
-            <span className="status-dot status-on" />
-            Ollama
-          </div>
-        </div>
-
-        <div className="left-dock-section">
-          <div className="left-dock-section-title">Simulation Settings</div>
-          <div className="left-dock-field">/home/user/automatic-urban-planner</div>
-        </div>
-
-        <div className="left-dock-section">
-          <div className="left-dock-section-title">Simulation</div>
-          <div className="scenario-save-row">
-            <input
-              type="text"
-              className="scenario-input"
-              placeholder="Scenario name"
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveScenario();
-              }}
-            />
-            <button
-              type="button"
-              className="scenario-save-btn"
-              onClick={handleSaveScenario}
-              disabled={!scenarioName.trim()}
-            >
-              Save
-            </button>
-          </div>
-
-          <div className="saved-scenarios-inline">
-            {savedScenarios.length === 0 ? (
-              <div className="left-dock-muted">No saved scenarios yet.</div>
-            ) : (
-              savedScenarios.map((name) => (
-                <div className="left-dock-chip" key={name}>
-                  {name}
-                </div>
-              ))
-            )}
-          </div>
-
-          <button
-            type="button"
-            className="left-dock-run-btn"
-            disabled={!selection.selectedGeoJSON || selection.count <= 0}
-            onClick={runSimulation}
-          >
-            Run simulation
-          </button>
-        </div>
-
-      </aside>
+      <LeftDock
+        sidebarHidden={sidebarHidden}
+        scenarioName={scenarioName}
+        setScenarioName={setScenarioName}
+        handleSaveScenario={handleSaveScenario}
+        savedScenarios={savedScenarios}
+        hasSelection={hasSelection}
+        runSimulation={runSimulation}
+        setSidebarHidden={setSidebarHidden}
+      />
 
       <div className="center-column">
         {sidebarHidden && (
@@ -218,7 +373,11 @@ function App() {
         <MapView
           buildingsGeoJSON={buildingsGeoJSON}
           selectedGeoJSON={selection.selectedGeoJSON}
+          lockedSelectionGeoJSON={lockedSelectionGeoJSONWithState}
+          selectionLocked={Boolean(confirmedSelection)}
+          constructionPhaseActive={Boolean(confirmedSelection)}
           onSelection={handleSelection}
+          onConstructionAreaSelection={handleConstructionAreaSelection}
         />
         {loadError && (
           <div
@@ -238,141 +397,38 @@ function App() {
             Buildings load error: {loadError}
           </div>
         )}
-        <aside className={["bottom-panel", "bottom-panel-left", leftCollapsed ? "is-collapsed" : ""].filter(Boolean).join(" ")}>
-          <div className="bottom-panel-header">
-            <div className="bottom-panel-title">
-              Chat
-              {selection.count > 0 ? ` — Selected: ${selection.count}` : ""}
-            </div>
-            <button
-              type="button"
-              className="bottom-panel-toggle"
-              aria-label={leftCollapsed ? "Expand left panel" : "Collapse left panel"}
-              onClick={() => setLeftCollapsed((v) => !v)}
-            >
-              {leftCollapsed ? "▲" : "▼"}
-            </button>
-          </div>
-          <div className="bottom-panel-body">
-            <div className="chatbot-section">
-              <div className="left-dock-section-title">Chatbot (Ollama)</div>
-              <div className="chat-window" aria-live="polite">
-                {chatMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={[
-                      "chat-message",
-                      msg.role === "user" ? "chat-user" : "chat-assistant"
-                    ].join(" ")}
-                  >
-                    <div className="chat-role">
-                      {msg.role === "user" ? "You" : "Assistant"}
-                    </div>
-                    <div className="chat-text">{msg.text}</div>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div className="chat-message chat-assistant">
-                    <div className="chat-role">Assistant</div>
-                    <div className="chat-text">Thinking...</div>
-                  </div>
-                )}
-              </div>
-              {chatError && <div className="chat-error">{chatError}</div>}
-              <div className="chat-input-row">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Type your message..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSendChat();
-                  }}
-                />
-                <button
-                  type="button"
-                  className="chat-send-btn"
-                  onClick={handleSendChat}
-                  disabled={chatLoading || !chatInput.trim()}
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <ChatPanel
+          leftCollapsed={leftCollapsed}
+          setLeftCollapsed={setLeftCollapsed}
+          activeSelectionCount={activeSelection.count}
+          chatMessages={chatMessages}
+          chatLoading={chatLoading}
+          chatError={chatError}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSendChat={handleSendChat}
+        />
 
-        <section className="selected-list-panel" aria-label="Selected buildings">
-          <div className="selected-list-header">
-            <div className="selected-list-title">
-              Selected Buildings ({selection.count})
-            </div>
-            <div className="selected-list-actions">
-              <a
-                className={[
-                  "action-link",
-                  downloadUrl && selection.count > 0 ? "" : "is-disabled"
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                href={downloadUrl || "#"}
-                download="selected_buildings.zip"
-                onClick={(e) => {
-                  if (!downloadUrl || selection.count <= 0) e.preventDefault();
-                }}
-              >
-                Download ZIP
-              </a>
-            </div>
-          </div>
+        <SelectionPanel
+          selection={selection}
+          confirmedSelection={confirmedSelection}
+          activeSelection={activeSelection}
+          handleConfirmSelection={handleConfirmSelection}
+          handleResetSelection={handleResetSelection}
+        />
 
-          <div className="selected-list-body">
-            {selection.selectionError && (
-              <div className="selected-empty selected-error">
-                Selection error: {selection.selectionError}
-              </div>
-            )}
-            {selection.buildings.length === 0 ? (
-              <div className="selected-empty">
-                No buildings selected yet.
-              </div>
-            ) : (
-              selection.buildings.map((building, index) => (
-                <article className="building-card" key={index}>
-                  <div className="building-card-title">Building {index + 1}</div>
-                  <div className="building-props">
-                    {Object.entries(building).map(([key, value]) => (
-                      <div className="building-prop-row" key={key}>
-                        <span className="building-prop-key">{key}</span>
-                        <span className="building-prop-value">
-                          {value === null || value === undefined
-                            ? "-"
-                            : String(value)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-
-        <aside className={["bottom-panel", "bottom-panel-right", rightCollapsed ? "is-collapsed" : ""].filter(Boolean).join(" ")}>
-          <div className="bottom-panel-header">
-            <div className="bottom-panel-title">Right panel</div>
-            <button
-              type="button"
-              className="bottom-panel-toggle"
-              aria-label={rightCollapsed ? "Expand right panel" : "Collapse right panel"}
-              onClick={() => setRightCollapsed((v) => !v)}
-            >
-              {rightCollapsed ? "▲" : "▼"}
-            </button>
-          </div>
-          <div className="bottom-panel-body">Content</div>
-        </aside>
+        <RightPanel
+          rightCollapsed={rightCollapsed}
+          setRightCollapsed={setRightCollapsed}
+          constructionPhaseActive={Boolean(confirmedSelection)}
+          mappingRows={constructionMappingRows}
+          mappingError={constructionMappingError}
+          constructionAreaSelection={constructionAreaSelection}
+          onConfirmConstructionFeatures={handleConfirmConstructionFeatures}
+          totalConfirmedBuildings={confirmedBuildingsWithAssignments.length}
+          definedBuildingCount={definedBuildingCount}
+          allConstructionDefined={allConstructionDefined}
+        />
       </div>
     </div>
   );

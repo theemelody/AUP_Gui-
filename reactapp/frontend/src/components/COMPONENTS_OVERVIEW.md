@@ -1,0 +1,70 @@
+# React Feature Components Overview
+
+App is now split into focused feature components to make development easier for new React contributors.
+
+## LeftDock
+
+LeftDock renders the full left sidebar and keeps UI-only behavior related to workspace controls.
+
+It includes:
+- model display and status rows
+- scenario input and save action
+- saved scenarios list
+- run simulation button
+
+App still owns the state and handlers, while LeftDock receives props for values and callbacks.
+
+## ChatPanel
+
+ChatPanel renders the floating chat panel over the map.
+
+It is responsible for:
+- collapse and expand interaction for the left bottom panel
+- displaying the message stream
+- showing loading and error states
+- handling input and send action from props
+
+The chat network request logic remains in App.
+
+## SelectionPanel
+
+SelectionPanel renders the bottom-center selected buildings list and selection actions.
+
+It handles:
+- draft vs confirmed title state
+- confirm/reset action button
+- selection error display
+- building card rendering and key ordering
+
+This component centralizes all selection-list UI so App does not contain long card-mapping JSX.
+
+## RightPanel
+
+RightPanel is a small placeholder component for the right floating panel.
+
+It currently controls:
+- collapse and expand behavior
+- static placeholder content
+
+It exists as a boundary so future tools and simulation details can be added without enlarging App.
+
+## MapView
+
+MapView remains the map interaction boundary.
+
+It owns:
+- map creation and draw controls
+- frontend spatial intersection selection
+- mapbox type to CEA use-type enrichment
+- confirmed selection rendering mode
+
+## App
+
+App is now the composition and state orchestration layer.
+
+It owns:
+- global UI state and workflow state
+- side effects (data load, chat request)
+- passing data and callbacks into child feature components
+
+This separation follows a common industry pattern: App as container, feature components as presentational and interaction boundaries.

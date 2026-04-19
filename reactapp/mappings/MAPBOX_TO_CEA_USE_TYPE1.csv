@@ -1,0 +1,60 @@
+mapbox_type,cea_use_type1,notes
+apartments,MULTI_RES,residential multi-unit
+farm,INDUSTRIAL,agricultural operations proxy
+dormitory,MULTI_RES,residential collective housing
+hotel,HOTEL,direct mapping
+house,SINGLE_RES,detached/single-family proxy
+detached,SINGLE_RES,detached residential
+residential,MULTI_RES,generic residential fallback
+terrace,MULTI_RES,row housing proxy
+houseboat,SINGLE_RES,single dwelling proxy
+bungalow,SINGLE_RES,single dwelling proxy
+cabin,SINGLE_RES,single dwelling proxy
+commercial,OFFICE,generic commercial fallback
+office,OFFICE,direct mapping
+industrial,INDUSTRIAL,direct mapping
+retail,RETAIL,direct mapping
+supermarket,FOODSTORE,food retail specific
+warehouse,INDUSTRIAL,logistics/storage proxy
+kiosk,RETAIL,small retail proxy
+religious,MUSEUM,assembly/cultural proxy
+cathedral,MUSEUM,assembly/cultural proxy
+temple,MUSEUM,assembly/cultural proxy
+chapel,MUSEUM,assembly/cultural proxy
+church,MUSEUM,assembly/cultural proxy
+mosque,MUSEUM,assembly/cultural proxy
+synagogue,MUSEUM,assembly/cultural proxy
+shrine,MUSEUM,assembly/cultural proxy
+civic,OFFICE,civic administration proxy
+government,OFFICE,administration proxy
+hospital,HOSPITAL,direct mapping
+school,SCHOOL,direct mapping
+transportation,OFFICE,conditioned transport building fallback
+stadium,GYM,sports facility proxy
+train_station,OFFICE,conditioned transport building fallback
+university,UNIVERSITY,direct mapping
+grandstand,GYM,sports spectator facility proxy
+public,OFFICE,generic public building fallback
+barn,INDUSTRIAL,agricultural utility proxy
+bridge,PARKING,unconditioned infrastructure fallback
+bunker,PARKING,unconditioned utility fallback
+carport,PARKING,unconditioned vehicle shelter
+conservatory,PARKING,unconditioned small structure fallback
+construction,PARKING,temporary/unconditioned fallback
+garage,PARKING,vehicle storage
+garages,PARKING,vehicle storage
+farm_auxiliary,PARKING,agricultural auxiliary unconditioned fallback
+garbage_shed,PARKING,unconditioned service structure
+greenhouse,INDUSTRIAL,agricultural conditioned proxy
+hangar,PARKING,usually unconditioned large shelter
+hut,PARKING,unconditioned small structure
+pavilion,PARKING,generic unconditioned fallback
+parking,PARKING,direct mapping
+roof,PARKING,non-habitable structure fallback
+sports_hall,GYM,sports facility proxy
+shed,PARKING,unconditioned utility structure
+stable,PARKING,agricultural auxiliary fallback
+service,OFFICE,generic service building fallback
+ruins,PARKING,non-conditioned fallback
+transformer_tower,PARKING,utility infrastructure fallback
+water_tower,PARKING,utility infrastructure fallback

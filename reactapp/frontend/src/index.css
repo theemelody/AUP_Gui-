@@ -1,17 +1,20 @@
 html,
 body,
 #root {
+  /* Make the app fill the viewport for map-first layout. */
   height: 100%;
   margin: 0;
   padding: 0;
 }
 
 body {
+  /* Default font stack for dashboard and map controls. */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
 
 .app-root {
+  /* Two-column shell: left dock + full-height interactive map area. */
   --dock-width: 280px;
   display: grid;
   grid-template-columns: var(--dock-width) 1fr;
@@ -23,6 +26,7 @@ body {
 }
 
 .left-dock {
+  /* Main control sidebar for model, scenario, and actions. */
   background: rgba(15, 23, 42, 0.95);
   color: #dbeafe;
   border-right: 1px solid rgba(148, 163, 184, 0.2);
@@ -292,6 +296,7 @@ body {
 }
 
 .bottom-panel {
+  /* Floating utility panels (chat and right-side content). */
   --panel-w: 360px;
   --panel-collapsed-h: 44px;
   position: absolute;
@@ -376,6 +381,7 @@ body {
 }
 
 .selected-list-panel {
+  /* Bottom-center panel listing current or confirmed selected buildings. */
   position: absolute;
   left: 50%;
   bottom: 12px;
@@ -514,5 +520,97 @@ body {
 .action-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.construction-status {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  color: #0f172a;
+}
+
+.status-complete {
+  color: #166534;
+  font-weight: 700;
+}
+
+.status-pending {
+  color: #92400e;
+  font-weight: 700;
+}
+
+.construction-section {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.construction-label {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.construction-use-type {
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.construction-muted {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.construction-error {
+  margin-top: 8px;
+  color: #7f1d1d;
+  font-size: 12px;
+  background: rgba(254, 226, 226, 0.7);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.construction-range-group {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.construction-range-label {
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.construction-field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.construction-select {
+  width: 100%;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+  padding: 0 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.construction-confirm-btn {
+  width: 100%;
 }
 
