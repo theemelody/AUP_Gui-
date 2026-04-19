@@ -34,11 +34,13 @@ Main files in `frontend/src/`:
 - `components/SelectionPanel.jsx`
   - Bottom-center selected buildings panel with confirm/reset actions and building cards.
 - `components/RightPanel.jsx`
-  - Right floating panel placeholder for future simulation outputs or tools.
+  - Right floating panel for construction-type feature definition.
+  - Shows year range and use-type-filtered refurbishment/detail options for area-selected confirmed buildings.
 - `components/MapView.jsx`
   - Map rendering and draw interaction.
   - Performs frontend-side selection against Mapbox `building` features.
   - Applies mapping (`mapbox_type` -> `cea_use_type1`) and basic feature enrichment.
+  - Renders confirmation state colors for selected buildings during construction phase.
 - `services/api.js`
   - API client wrappers for backend endpoints.
 - `index.css`
@@ -56,6 +58,8 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
   - Backend selection endpoint based on drawn geometry (SHP workflow).
 - `GET /api/mapbox-cea-use-type-mapping`
   - Serves CSV-based mapping for frontend selection.
+- `GET /api/construction-type-mapping`
+  - Serves normalized construction-type decomposition rows from CSV.
 - `POST /api/chat`
   - Forwards prompts to Ollama (`/api/chat` with `/api/generate` fallback).
 
@@ -68,10 +72,20 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
    - normalized `height` / `min_height`
    - `estimated_floors`
    - mapped `cea_use_type1`
-5. User can click **Confirm selection**:
-   - non-selected buildings are hidden
-   - confirmed set remains visible in orange
-6. User can click **Reset selection** to return to drawing mode.
+5. User clicks Confirm selection:
+  - confirmed set remains visible in orange (pending feature definition)
+  - construction phase is enabled
+6. User draws area(s) over confirmed buildings during construction phase.
+7. Right panel shows options filtered to the area-selected building use types:
+  - year range (1800 to 2030)
+  - refurbishment type
+  - detail type
+8. User clicks Confirm features:
+  - matching `const_type` is assigned per selected building
+  - defined buildings turn yellow
+9. When all confirmed buildings are defined:
+  - all confirmed buildings turn green
+10. User can click Reset selection to return to initial drawing mode.
 
 ## Mapping Workflow
 
@@ -90,7 +104,7 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
 - `detail`
 - `cea_use_type1`
 
-This file is intended for later building-type assignment logic from user selections.
+This file is now used by the active construction-phase assignment workflow.
 
 ## Run Instructions
 
@@ -133,3 +147,4 @@ Frontend (`frontend/.env` if needed):
 - If backend imports appear unresolved in editor diagnostics, ensure the Python interpreter is set to `reactapp/.venv`.
 - Keep mapping CSVs as source-of-truth where possible; avoid hardcoding category logic in components.
 - The UI is intentionally split into feature components so `App.jsx` stays as the orchestration layer instead of a large monolithic page file.
+- The construction mapping parser is resilient to CSV header variations (BOM / key-format differences) and normalizes rows before frontend use.

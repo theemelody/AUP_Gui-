@@ -40,13 +40,17 @@ This component centralizes all selection-list UI so App does not contain long ca
 
 ## RightPanel
 
-RightPanel is a small placeholder component for the right floating panel.
+RightPanel renders the active construction-type phase tools.
 
 It currently controls:
 - collapse and expand behavior
-- static placeholder content
+- construction-phase status summary (confirmed / defined counts)
+- year-range controls (start and end)
+- per-use-type filtered refurbishment and detail selectors
+- confirm-features action button
+- mapping and selection error display
 
-It exists as a boundary so future tools and simulation details can be added without enlarging App.
+It receives normalized mapping rows and current construction-area selection from App.
 
 ## MapView
 
@@ -56,7 +60,14 @@ It owns:
 - map creation and draw controls
 - frontend spatial intersection selection
 - mapbox type to CEA use-type enrichment
-- confirmed selection rendering mode
+- phase-aware draw behavior:
+	- initial building selection
+	- construction-area selection over confirmed buildings
+- confirmed building rendering with state colors:
+	- pending = orange
+	- defined = yellow
+	- complete = green
+- map resize handling for stable draw/pointer alignment
 
 ## App
 
@@ -65,6 +76,9 @@ App is now the composition and state orchestration layer.
 It owns:
 - global UI state and workflow state
 - side effects (data load, chat request)
+- construction mapping fetch and normalization consumption
+- construction assignment state keyed per confirmed building
+- derivation of locked/confirmed GeoJSON enriched with assignment state
 - passing data and callbacks into child feature components
 
 This separation follows a common industry pattern: App as container, feature components as presentational and interaction boundaries.
