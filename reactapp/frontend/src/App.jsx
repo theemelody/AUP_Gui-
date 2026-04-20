@@ -153,7 +153,7 @@ function App() {
   }, []);
 
   const handleConfirmConstructionFeatures = useCallback(
-    ({ yearStart, yearEnd, useTypeSelections }) => {
+    ({ useTypeSelections }) => {
       if (!Array.isArray(constructionAreaSelection.buildingKeys) || !constructionAreaSelection.buildingKeys.length) {
         return;
       }
@@ -163,22 +163,30 @@ function App() {
         const building = constructionAreaSelection.buildings[index] || {};
         const useType = String(building.cea_use_type1 || "").toUpperCase();
         const selected = useTypeSelections?.[useType];
-        if (!useType || !selected?.refurbishment_type || !selected?.detail) return;
+        if (
+          !useType ||
+          !selected?.refurbishment_type ||
+          !selected?.detail ||
+          !Number.isFinite(selected?.year_start) ||
+          !Number.isFinite(selected?.year_end)
+        ) {
+          return;
+        }
 
         const row = findBestConstructionRow(
           constructionMappingRows,
           useType,
           selected.refurbishment_type,
           selected.detail,
-          yearStart,
-          yearEnd
+          selected.year_start,
+          selected.year_end
         );
         if (!row) return;
 
         nextAssignments[key] = {
           const_type: row.const_type,
-          year_start: yearStart,
-          year_end: yearEnd,
+          year_start: selected.year_start,
+          year_end: selected.year_end,
           refurbishment_type: selected.refurbishment_type,
           detail: selected.detail,
           cea_use_type1: useType

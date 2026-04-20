@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-const MIN_YEAR = 1800;
-const MAX_YEAR = 2030;
-
-function clampYear(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return MIN_YEAR;
-  return Math.max(MIN_YEAR, Math.min(MAX_YEAR, Math.round(numeric)));
-}
-
 function uniqueNonEmpty(values) {
   return Array.from(
     new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
@@ -59,6 +50,30 @@ function getDetailValue(row) {
   return getRowValue(row, ["detail", "detail_type", "detailType"]);
 }
 
+function getYearRangeOptions(rows) {
+  const options = [];
+  const seen = new Set();
+
+  rows.forEach((row) => {
+    const yearStart = Number(row?.year_start);
+    const yearEnd = Number(row?.year_end);
+    if (!Number.isFinite(yearStart) || !Number.isFinite(yearEnd)) return;
+
+    const value = `${yearStart}-${yearEnd}`;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    options.push({
+      value,
+      label: `${yearStart}-${yearEnd}`,
+      year_start: yearStart,
+      year_end: yearEnd
+    });
+  });
+
+  return options.sort((a, b) => a.year_start - b.year_start || a.year_end - b.year_end);
+}
+
 function RightPanel({
   rightCollapsed,
   setRightCollapsed,
@@ -71,8 +86,6 @@ function RightPanel({
   definedBuildingCount,
   allConstructionDefined
 }) {
-  const [yearStart, setYearStart] = useState(MIN_YEAR);
-  const [yearEnd, setYearEnd] = useState(MAX_YEAR);
   const [useTypeSelections, setUseTypeSelections] = useState({});
 
   const areaUseTypes = useMemo(() => {
@@ -141,9 +154,28 @@ function RightPanel({
           ? previousDetail
           : detailOptions[0] || "";
 
+        const yearRangeSourceRows =
+          refurbishment_type && detail
+            ? useRows.filter(
+                (row) =>
+                  getRefurbishmentValue(row) === refurbishment_type &&
+                  getDetailValue(row) === detail
+              )
+            : [];
+
+        const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+        const previousYearRange = prev?.[useType]?.year_range;
+        const selectedYearRange =
+          yearRangeOptions.find((option) => option.value === previousYearRange) ||
+          yearRangeOptions[0] ||
+          null;
+
         next[useType] = {
           refurbishment_type,
-          detail
+          detail,
+          year_range: selectedYearRange?.value || "",
+          year_start: selectedYearRange?.year_start ?? null,
+          year_end: selectedYearRange?.year_end ?? null
         };
       });
 
@@ -157,7 +189,8 @@ function RightPanel({
     areaUseTypes.every(
       (useType) =>
         useTypeSelections?.[useType]?.refurbishment_type &&
-        useTypeSelections?.[useType]?.detail
+        useTypeSelections?.[useType]?.detail &&
+        useTypeSelections?.[useType]?.year_range
     );
 
   const handleRefurbishmentChange = (useType, refurbishment_type) => {
@@ -169,31 +202,88 @@ function RightPanel({
           .map((row) => getDetailValue(row))
       );
 
+      const nextDetail = detailOptions[0] || "";
+      const yearRangeSourceRows = nextDetail
+        ? useRows.filter(
+            (row) =>
+              getRefurbishmentValue(row) === refurbishment_type &&
+              getDetailValue(row) === nextDetail
+          )
+        : [];
+      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+      const selectedYearRange = yearRangeOptions[0] || null;
+
       return {
         ...prev,
         [useType]: {
           refurbishment_type,
-          detail: detailOptions[0] || ""
+          detail: nextDetail,
+          year_range: selectedYearRange?.value || "",
+          year_start: selectedYearRange?.year_start ?? null,
+          year_end: selectedYearRange?.year_end ?? null
         }
       };
     });
   };
 
   const handleDetailChange = (useType, detail) => {
-    setUseTypeSelections((prev) => ({
-      ...prev,
-      [useType]: {
-        ...(prev?.[useType] || {}),
-        detail
-      }
-    }));
+    setUseTypeSelections((prev) => {
+      const refurbishment_type = prev?.[useType]?.refurbishment_type || "";
+      const useRows = getRowsForUseType(useType);
+      const yearRangeSourceRows = refurbishment_type
+        ? useRows.filter(
+            (row) =>
+              getRefurbishmentValue(row) === refurbishment_type &&
+              getDetailValue(row) === detail
+          )
+        : [];
+      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+      const selectedYearRange = yearRangeOptions[0] || null;
+
+      return {
+        ...prev,
+        [useType]: {
+          ...(prev?.[useType] || {}),
+          detail,
+          year_range: selectedYearRange?.value || "",
+          year_start: selectedYearRange?.year_start ?? null,
+          year_end: selectedYearRange?.year_end ?? null
+        }
+      };
+    });
+  };
+
+  const handleYearRangeChange = (useType, yearRange) => {
+    setUseTypeSelections((prev) => {
+      const current = prev?.[useType] || {};
+      const useRows = getRowsForUseType(useType);
+      const yearRangeSourceRows =
+        current.refurbishment_type && current.detail
+          ? useRows.filter(
+              (row) =>
+                getRefurbishmentValue(row) === current.refurbishment_type &&
+                getDetailValue(row) === current.detail
+            )
+          : [];
+      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+      const selectedYearRange =
+        yearRangeOptions.find((option) => option.value === yearRange) || null;
+
+      return {
+        ...prev,
+        [useType]: {
+          ...current,
+          year_range: selectedYearRange?.value || "",
+          year_start: selectedYearRange?.year_start ?? null,
+          year_end: selectedYearRange?.year_end ?? null
+        }
+      };
+    });
   };
 
   const handleConfirm = () => {
     if (!canConfirmFeatures) return;
     onConfirmConstructionFeatures?.({
-      yearStart,
-      yearEnd,
       useTypeSelections
     });
   };
@@ -232,8 +322,8 @@ function RightPanel({
               <div>Defined: {definedBuildingCount}</div>
               <div className={allConstructionDefined ? "status-complete" : "status-pending"}>
                 {allConstructionDefined
-                  ? "All defined: buildings are green"
-                  : "In progress: defined buildings are yellow"}
+                  ? "All defined"
+                  : "In progress"}
               </div>
             </div>
 
@@ -251,44 +341,6 @@ function RightPanel({
                   Selection error: {constructionAreaSelection.selectionError}
                 </div>
               )}
-            </div>
-
-            <div className="construction-section">
-              <div className="construction-label">
-                Year range ({yearStart} - {yearEnd})
-              </div>
-              <div className="construction-range-group">
-                <label className="construction-range-label" htmlFor="year-start-range">
-                  Start year
-                </label>
-                <input
-                  id="year-start-range"
-                  type="range"
-                  min={MIN_YEAR}
-                  max={MAX_YEAR}
-                  value={yearStart}
-                  onChange={(e) => {
-                    const next = clampYear(e.target.value);
-                    setYearStart(Math.min(next, yearEnd));
-                  }}
-                />
-              </div>
-              <div className="construction-range-group">
-                <label className="construction-range-label" htmlFor="year-end-range">
-                  End year
-                </label>
-                <input
-                  id="year-end-range"
-                  type="range"
-                  min={MIN_YEAR}
-                  max={MAX_YEAR}
-                  value={yearEnd}
-                  onChange={(e) => {
-                    const next = clampYear(e.target.value);
-                    setYearEnd(Math.max(next, yearStart));
-                  }}
-                />
-              </div>
             </div>
 
             {areaUseTypes.length === 0 ? (
@@ -313,6 +365,16 @@ function RightPanel({
                   ).map((row) => getDetailValue(row))
                 );
                 const selectedDetail = useTypeSelections?.[useType]?.detail || "";
+                const yearRangeOptions = getYearRangeOptions(
+                  selectedRefurb && selectedDetail
+                    ? useRows.filter(
+                        (row) =>
+                          getRefurbishmentValue(row) === selectedRefurb &&
+                          getDetailValue(row) === selectedDetail
+                      )
+                    : []
+                );
+                const selectedYearRange = useTypeSelections?.[useType]?.year_range || "";
 
                 return (
                   <div className="construction-section" key={useType}>
@@ -362,6 +424,29 @@ function RightPanel({
                       {detailOptions.map((option) => (
                         <option key={option} value={option}>
                           {option}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label
+                      className="construction-field-label"
+                      htmlFor={`year-range-${useType}`}
+                    >
+                      Year range
+                    </label>
+                    <select
+                      id={`year-range-${useType}`}
+                      className="construction-select"
+                      value={selectedYearRange || ""}
+                      onChange={(e) => handleYearRangeChange(useType, e.target.value)}
+                      disabled={!yearRangeOptions.length}
+                    >
+                      {!yearRangeOptions.length && (
+                        <option value="">No year range options</option>
+                      )}
+                      {yearRangeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
