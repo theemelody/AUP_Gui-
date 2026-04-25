@@ -13,14 +13,57 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 function getMapboxBuildingType(properties) {
   // Mapbox building features can expose category in different fields depending on source.
-  const raw = properties?.type || properties?.class || properties?.building || null;
-  if (!raw) return null;
-  return String(raw).trim().toLowerCase();
+  const candidates = [
+    properties?.class,
+    properties?.building,
+    properties?.subclass,
+    properties?.type
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim().toLowerCase();
+    if (!value) continue;
+    if (value === "building") continue;
+    return value;
+  }
+
+  const fallback = String(properties?.type || properties?.class || properties?.building || "")
+    .trim()
+    .toLowerCase();
+  return fallback || null;
 }
 
 function mapToCeaUseType1(mapboxType, mapping) {
   if (!mapboxType) return null;
   return mapping?.[mapboxType] || null;
+}
+
+function inferCeaUseType1(properties, mapboxType) {
+  const floors = estimateFloors(properties);
+  const height = Number(properties?.height);
+  const genericBuilding = !mapboxType || mapboxType === "building";
+
+  if (genericBuilding) {
+    if (Number.isFinite(floors)) {
+      return floors <= 2 ? "SINGLE_RES" : "MULTI_RES";
+    }
+    if (Number.isFinite(height)) {
+      return height < 10 ? "SINGLE_RES" : "MULTI_RES";
+    }
+    return "MULTI_RES";
+  }
+
+  if (Number.isFinite(floors)) {
+    if (floors <= 2) return "SINGLE_RES";
+    if (floors <= 5) return "MULTI_RES";
+  }
+
+  if (Number.isFinite(height)) {
+    if (height < 10) return "SINGLE_RES";
+    if (height < 20) return "MULTI_RES";
+  }
+
+  return null;
 }
 
 function normalizeGeoJSON(value) {
@@ -103,7 +146,11 @@ function normalizeMapboxFeature(feature, mapping, index = 0) {
   const height = Number(properties.height);
   const minHeight = Number(properties.min_height ?? 0);
   const mapboxType = getMapboxBuildingType(properties);
-  const mappedUseType = mapToCeaUseType1(mapboxType, mapping) || "MULTI_RES";
+  const mappedUseType =
+    mapToCeaUseType1(mapboxType, mapping) ||
+    String(properties?.cea_use_type1 || "").trim().toUpperCase() ||
+    inferCeaUseType1(properties, mapboxType) ||
+    "UNKNOWN";
   const stableKey = getFeatureStableKey(feature, index);
   const geometry = toPlainGeometry(feature?.geometry);
 
@@ -116,6 +163,7 @@ function normalizeMapboxFeature(feature, mapping, index = 0) {
     properties: {
       ...properties,
       __selection_key: stableKey,
+      mapbox_type: mapboxType,
       cea_use_type1: mappedUseType,
       height: Number.isFinite(height) ? height : null,
       min_height: Number.isFinite(minHeight) ? minHeight : 0,
@@ -399,7 +447,7 @@ function MapView({
   const drawRef = useRef(null);
   const selectDebounceRef = useRef(null);
   const mapboxCeaUseTypeMappingRef = useRef({});
-  const mapboxMappingLoadedRef = useRef(false);
+  const mapboxMappingPromiseRef = useRef(null);
   const selectionLockedRef = useRef(selectionLocked);
   const constructionPhaseActiveRef = useRef(constructionPhaseActive);
   const lockedSelectionGeoJSONRef = useRef(normalizedLockedSelectionGeoJSON);
@@ -427,24 +475,33 @@ function MapView({
     onConstructionAreaSelectionRef.current = onConstructionAreaSelection;
   }, [onConstructionAreaSelection]);
 
-  useEffect(() => {
-    // Load mapbox->CEA mapping once; selection falls back to MULTI_RES if unavailable.
-    if (mapboxMappingLoadedRef.current) return;
-    mapboxMappingLoadedRef.current = true;
-    let cancelled = false;
-    fetchMapboxCeaUseTypeMapping()
-      .then((mapping) => {
-        if (!cancelled && mapping && typeof mapping === "object") {
-          mapboxCeaUseTypeMappingRef.current = mapping;
-        }
-      })
-      .catch(() => {
-        // Keep fallback behavior when mapping CSV is unavailable.
-      });
-    return () => {
-      cancelled = true;
-    };
+  const ensureMapboxMappingLoaded = useCallback(async () => {
+    if (Object.keys(mapboxCeaUseTypeMappingRef.current || {}).length > 0) {
+      return mapboxCeaUseTypeMappingRef.current;
+    }
+
+    if (!mapboxMappingPromiseRef.current) {
+      mapboxMappingPromiseRef.current = fetchMapboxCeaUseTypeMapping()
+        .then((mapping) => {
+          if (mapping && typeof mapping === "object") {
+            mapboxCeaUseTypeMappingRef.current = mapping;
+            return mapping;
+          }
+          return {};
+        })
+        .catch(() => ({}))
+        .finally(() => {
+          mapboxMappingPromiseRef.current = null;
+        });
+    }
+
+    return mapboxMappingPromiseRef.current;
   }, []);
+
+  useEffect(() => {
+    // Warm mapping cache early to avoid first-selection race.
+    ensureMapboxMappingLoaded();
+  }, [ensureMapboxMappingLoaded]);
 
   const fitMapToBounds = useCallback(() => {
     // Fit map to static buildings extent on first load in SHP mode.
@@ -539,7 +596,7 @@ function MapView({
         trash: true
       }
     });
-    map.addControl(draw, "top-left");
+    map.addControl(draw, "bottom-left");
     drawRef.current = draw;
 
     const fireSelection = (geometry) => {
@@ -581,10 +638,14 @@ function MapView({
               selection_error: null
             });
           } else {
+            const mapping = await ensureMapboxMappingLoaded();
+            if (!mapping || Object.keys(mapping).length === 0) {
+              throw new Error("Mapbox type mapping not loaded yet. Please try selection again.");
+            }
             const result = selectBuildingsFromMapbox(
               map,
               geometry,
-              mapboxCeaUseTypeMappingRef.current
+              mapping
             );
             onSelectionRef.current?.({ ...result, selection_error: null });
           }
@@ -624,7 +685,7 @@ function MapView({
     map.on("draw.create", handleChange);
     map.on("draw.update", handleChange);
     map.on("draw.delete", () => fireSelection(null));
-  }, []);
+  }, [ensureMapboxMappingLoaded]);
 
   const handleMapLoad = useCallback(() => {
     init3D();
@@ -728,8 +789,8 @@ function MapView({
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
       >
-        <NavigationControl position="top-left" />
-        <FullscreenControl position="top-left" />
+        <NavigationControl position="bottom-left" />
+        <FullscreenControl position="bottom-left" />
 
         {geojson && (
           <Source id="buildings" type="geojson" data={geojson}>

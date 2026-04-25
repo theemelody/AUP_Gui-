@@ -29,6 +29,7 @@ civic,OFFICE,civic administration proxy
 government,OFFICE,administration proxy
 hospital,HOSPITAL,direct mapping
 school,SCHOOL,direct mapping
+kindergarten,SCHOOL,early education facility mapping
 transportation,OFFICE,conditioned transport building fallback
 stadium,GYM,sports facility proxy
 train_station,OFFICE,conditioned transport building fallback

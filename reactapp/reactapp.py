@@ -10,6 +10,7 @@ import tempfile
 import os
 from io import BytesIO
 import base64
+import json
 import requests
 from dotenv import load_dotenv
 
@@ -44,6 +45,9 @@ MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH = os.path.join(
 CONSTRUCTION_TYPE_MAPPING_PATH = os.path.join(
     BASE_DIR, "mappings", "DE_CONSTRUCTION_TYPE_MAPPING.csv"
 )
+CONSTRUCTION_TYPE_MAPPING_JSON_PATH = os.path.join(
+    BASE_DIR, "mappings", "DE_CONSTRUCTION_TYPE_MAPPING.json"
+)
 
 try:
     gdf = gpd.read_file(DATA_PATH)
@@ -74,12 +78,33 @@ def load_mapbox_to_cea_use_type_mapping():
             f"Mapping file not found: {MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH}"
         )
 
+    def normalize_key(value: str) -> str:
+        return (
+            str(value or "")
+            .replace("\ufeff", "")
+            .strip()
+            .lower()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", "")
+        )
+
+    def read_row_value(row_dict: dict, aliases: list[str]) -> str:
+        normalized_aliases = {normalize_key(alias) for alias in aliases}
+        for key, value in row_dict.items():
+            if normalize_key(key) in normalized_aliases:
+                return str(value or "").strip()
+        return ""
+
     mapping = {}
     with open(MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            mapbox_type = (row.get("mapbox_type") or "").strip().lower()
-            cea_type = (row.get("cea_use_type1") or "").strip().upper()
+            mapbox_type = read_row_value(row, ["mapbox_type", "mapboxType"]).lower()
+            cea_type = read_row_value(
+                row,
+                ["cea_use_type1", "ceaUseType1", "use_type", "useType"],
+            ).upper()
             if mapbox_type and cea_type:
                 mapping[mapbox_type] = cea_type
 
@@ -87,7 +112,83 @@ def load_mapbox_to_cea_use_type_mapping():
 
 
 def load_construction_type_mapping():
-    """Load decomposed construction types from CSV used by construction phase UI."""
+    """Load decomposed construction types from JSON or CSV used by construction phase UI."""
+
+    def normalize_mapbox_types(value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            raw_values = value
+        else:
+            raw_values = [item.strip() for item in str(value).split(",")]
+
+        seen = set()
+        normalized = []
+        for item in raw_values:
+            normalized_item = str(item or "").strip().lower()
+            if not normalized_item or normalized_item in seen:
+                continue
+            seen.add(normalized_item)
+            normalized.append(normalized_item)
+        return normalized
+
+    if os.path.exists(CONSTRUCTION_TYPE_MAPPING_JSON_PATH):
+        with open(CONSTRUCTION_TYPE_MAPPING_JSON_PATH, encoding="utf-8") as f:
+            payload = json.load(f)
+
+        rows = payload.get("rows") if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            raise ValueError("Construction mapping JSON must contain a list of rows")
+
+        normalized_rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            try:
+                year_start = int(row.get("year_start"))
+                year_end = int(row.get("year_end"))
+            except (TypeError, ValueError):
+                continue
+
+            const_type = str(row.get("const_type") or row.get("constType") or "").strip()
+            refurb = str(
+                row.get("refurbishment_type")
+                or row.get("refurbishmentType")
+                or row.get("refurbishment")
+                or ""
+            ).strip()
+            detail = str(row.get("detail") or row.get("detail_type") or row.get("detailType") or "").strip()
+            cea_use_type1 = str(
+                row.get("cea_use_type1")
+                or row.get("ceaUseType1")
+                or row.get("use_type")
+                or row.get("useType")
+                or ""
+            ).strip().upper()
+            mapbox_types = normalize_mapbox_types(
+                row.get("mapbox_type")
+                or row.get("mapboxType")
+                or row.get("mapbox_types")
+                or row.get("mapboxTypes")
+            )
+
+            if not (const_type and refurb and detail and cea_use_type1):
+                continue
+
+            normalized_rows.append(
+                {
+                    "const_type": const_type,
+                    "year_start": year_start,
+                    "year_end": year_end,
+                    "refurbishment_type": refurb,
+                    "detail": detail,
+                    "cea_use_type1": cea_use_type1,
+                    "mapbox_type": mapbox_types,
+                }
+            )
+
+        return normalized_rows
+
     if not os.path.exists(CONSTRUCTION_TYPE_MAPPING_PATH):
         raise FileNotFoundError(
             f"Construction mapping file not found: {CONSTRUCTION_TYPE_MAPPING_PATH}"
@@ -140,6 +241,7 @@ def load_construction_type_mapping():
                     "refurbishment_type": refurb,
                     "detail": detail,
                     "cea_use_type1": cea_use_type1,
+                    "mapbox_type": [],
                 }
             )
 

@@ -50,6 +50,28 @@ function getDetailValue(row) {
   return getRowValue(row, ["detail", "detail_type", "detailType"]);
 }
 
+function normalizeMapboxType(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getBuildingMapboxType(building) {
+  return normalizeMapboxType(
+    building?.mapbox_type || building?.mapboxType || building?.type || building?.class || building?.building
+  );
+}
+
+function getRowMapboxTypes(row) {
+  const raw = row?.mapbox_type ?? row?.mapboxType ?? row?.mapbox_types ?? row?.mapboxTypes;
+  const values = Array.isArray(raw)
+    ? raw
+    : String(raw || "")
+        .split(/[,;|]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  return uniqueNonEmpty(values.map((value) => normalizeMapboxType(value)));
+}
+
 function getYearRangeOptions(rows) {
   const options = [];
   const seen = new Set();
@@ -74,6 +96,44 @@ function getYearRangeOptions(rows) {
   return options.sort((a, b) => a.year_start - b.year_start || a.year_end - b.year_end);
 }
 
+function buildSelectionFromRows(rows, previousSelection = {}) {
+  const refurbOptions = uniqueNonEmpty(rows.map((row) => getRefurbishmentValue(row)));
+  const refurbishment_type = refurbOptions.includes(previousSelection.refurbishment_type)
+    ? previousSelection.refurbishment_type
+    : refurbOptions[0] || "";
+
+  const detailSourceRows = refurbishment_type
+    ? rows.filter((row) => getRefurbishmentValue(row) === refurbishment_type)
+    : rows;
+  const detailOptions = uniqueNonEmpty(detailSourceRows.map((row) => getDetailValue(row)));
+  const detail = detailOptions.includes(previousSelection.detail)
+    ? previousSelection.detail
+    : detailOptions[0] || "";
+
+  const yearRangeSourceRows =
+    refurbishment_type && detail
+      ? rows.filter(
+          (row) =>
+            getRefurbishmentValue(row) === refurbishment_type &&
+            getDetailValue(row) === detail
+        )
+      : [];
+  const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+  const selectedYearRange =
+    yearRangeOptions.find((option) => option.value === previousSelection.year_range) ||
+    yearRangeOptions[0] ||
+    null;
+
+  return {
+    refurbishment_type,
+    detail,
+    year_range: selectedYearRange?.value || "",
+    year_start: selectedYearRange?.year_start ?? null,
+    year_end: selectedYearRange?.year_end ?? null,
+    hasOptions: Boolean(refurbOptions.length && detailOptions.length && yearRangeOptions.length)
+  };
+}
+
 function RightPanel({
   rightCollapsed,
   setRightCollapsed,
@@ -87,6 +147,8 @@ function RightPanel({
   allConstructionDefined
 }) {
   const [useTypeSelections, setUseTypeSelections] = useState({});
+  const [expandedUseType, setExpandedUseType] = useState("");
+  const [expandedMapboxPanel, setExpandedMapboxPanel] = useState("");
 
   const areaUseTypes = useMemo(() => {
     const useTypes = (constructionAreaSelection?.buildings || [])
@@ -94,6 +156,39 @@ function RightPanel({
       .filter(Boolean);
     return Array.from(new Set(useTypes)).sort();
   }, [constructionAreaSelection]);
+
+  const areaBuildingsByUseType = useMemo(() => {
+    const grouped = {};
+    (constructionAreaSelection?.buildings || []).forEach((building) => {
+      const useType = String(building?.cea_use_type1 || "").trim().toUpperCase();
+      if (!useType) return;
+      if (!grouped[useType]) grouped[useType] = [];
+      grouped[useType].push(building);
+    });
+    return grouped;
+  }, [constructionAreaSelection]);
+
+  const areaBuildingsByUseTypeAndMapbox = useMemo(() => {
+    const grouped = {};
+    (constructionAreaSelection?.buildings || []).forEach((building) => {
+      const useType = String(building?.cea_use_type1 || "").trim().toUpperCase();
+      const mapboxType = getBuildingMapboxType(building);
+      if (!useType || !mapboxType) return;
+      if (!grouped[useType]) grouped[useType] = {};
+      if (!grouped[useType][mapboxType]) grouped[useType][mapboxType] = [];
+      grouped[useType][mapboxType].push(building);
+    });
+
+    return grouped;
+  }, [constructionAreaSelection]);
+
+  const areaMapboxTypesByUseType = useMemo(() => {
+    const grouped = {};
+    Object.entries(areaBuildingsByUseTypeAndMapbox).forEach(([useType, byMapbox]) => {
+      grouped[useType] = Object.keys(byMapbox).sort();
+    });
+    return grouped;
+  }, [areaBuildingsByUseTypeAndMapbox]);
 
   const rowsByUseType = useMemo(() => {
     const exact = {};
@@ -121,6 +216,26 @@ function RightPanel({
     return rowsByUseType.normalized?.[normalizeUseType(useType)] || [];
   };
 
+  const getRowsForUseTypeAndMapboxType = (useType, mapboxType) =>
+    getFilteredRowsForUseType(useType, mapboxType);
+
+  const getMapboxTypeOptionsForUseType = (useType) =>
+    uniqueNonEmpty((areaBuildingsByUseType?.[useType] || []).map((building) => getBuildingMapboxType(building)));
+
+  const getFilteredRowsForUseType = (useType, mapboxType) => {
+    const useRows = getRowsForUseType(useType);
+    const normalizedMapboxType = normalizeMapboxType(mapboxType);
+    if (!normalizedMapboxType) return useRows;
+
+    const filteredRows = useRows.filter((row) => {
+      const rowMapboxTypes = getRowMapboxTypes(row);
+      return !rowMapboxTypes.length || rowMapboxTypes.includes(normalizedMapboxType);
+    });
+
+    // If no row is tagged for this specific mapbox type, fallback to use-type rows.
+    return filteredRows.length ? filteredRows : useRows;
+  };
+
   useEffect(() => {
     if (!areaUseTypes.length) {
       setUseTypeSelections({});
@@ -131,153 +246,141 @@ function RightPanel({
       const next = {};
 
       areaUseTypes.forEach((useType) => {
-        const useRows = getRowsForUseType(useType);
-        const refurbOptions = uniqueNonEmpty(
-          useRows.map((row) => getRefurbishmentValue(row))
-        );
+        next[useType] = {};
+        const mapboxTypes = areaMapboxTypesByUseType[useType] || [];
 
-        const previousRefurb = prev?.[useType]?.refurbishment_type;
-        const refurbishment_type = refurbOptions.includes(previousRefurb)
-          ? previousRefurb
-          : refurbOptions[0] || "";
-
-        const detailSourceRows = refurbishment_type
-          ? useRows.filter((row) => getRefurbishmentValue(row) === refurbishment_type)
-          : useRows;
-
-        const detailOptions = uniqueNonEmpty(
-          detailSourceRows.map((row) => getDetailValue(row))
-        );
-
-        const previousDetail = prev?.[useType]?.detail;
-        const detail = detailOptions.includes(previousDetail)
-          ? previousDetail
-          : detailOptions[0] || "";
-
-        const yearRangeSourceRows =
-          refurbishment_type && detail
-            ? useRows.filter(
-                (row) =>
-                  getRefurbishmentValue(row) === refurbishment_type &&
-                  getDetailValue(row) === detail
-              )
-            : [];
-
-        const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
-        const previousYearRange = prev?.[useType]?.year_range;
-        const selectedYearRange =
-          yearRangeOptions.find((option) => option.value === previousYearRange) ||
-          yearRangeOptions[0] ||
-          null;
-
-        next[useType] = {
-          refurbishment_type,
-          detail,
-          year_range: selectedYearRange?.value || "",
-          year_start: selectedYearRange?.year_start ?? null,
-          year_end: selectedYearRange?.year_end ?? null
-        };
+        mapboxTypes.forEach((mapboxType) => {
+          const previousSelection = prev?.[useType]?.[mapboxType] || {};
+          const useRows = getRowsForUseTypeAndMapboxType(useType, mapboxType);
+          next[useType][mapboxType] = {
+            ...buildSelectionFromRows(useRows, previousSelection),
+            mapbox_type: mapboxType
+          };
+        });
       });
 
       return next;
     });
-  }, [areaUseTypes, rowsByUseType]);
+  }, [areaMapboxTypesByUseType, areaUseTypes, rowsByUseType]);
+
+  useEffect(() => {
+    if (!areaUseTypes.length) {
+      setExpandedUseType("");
+      setExpandedMapboxPanel("");
+      return;
+    }
+
+    setExpandedUseType((prev) =>
+      prev && areaUseTypes.includes(prev) ? prev : areaUseTypes[0]
+    );
+    setExpandedMapboxPanel((prev) => {
+      const availablePanels = areaUseTypes.flatMap((useType) =>
+        (areaMapboxTypesByUseType[useType] || []).map((mapboxType) => `${useType}::${mapboxType}`)
+      );
+      return prev && availablePanels.includes(prev) ? prev : availablePanels[0] || "";
+    });
+  }, [areaMapboxTypesByUseType, areaUseTypes]);
+
+  const getSelectionFor = (useType, mapboxType) =>
+    useTypeSelections?.[useType]?.[mapboxType] || null;
 
   const canConfirmFeatures =
     constructionAreaSelection?.count > 0 &&
     areaUseTypes.length > 0 &&
-    areaUseTypes.every(
-      (useType) =>
-        useTypeSelections?.[useType]?.refurbishment_type &&
-        useTypeSelections?.[useType]?.detail &&
-        useTypeSelections?.[useType]?.year_range
+    areaUseTypes.every((useType) => {
+      const mapboxTypes = areaMapboxTypesByUseType[useType] || [];
+      return mapboxTypes.every((mapboxType) => {
+        const current = useTypeSelections?.[useType]?.[mapboxType];
+        return Boolean(
+          current?.mapbox_type &&
+            current?.refurbishment_type &&
+            current?.detail &&
+            current?.year_range
+        );
+      });
+    });
+
+  const handleSelectionChange = (useType, mapboxType, nextSelection) => {
+    setUseTypeSelections((prev) => ({
+      ...prev,
+      [useType]: {
+        ...(prev?.[useType] || {}),
+        [mapboxType]: {
+          ...(prev?.[useType]?.[mapboxType] || {}),
+          ...nextSelection,
+          mapbox_type: mapboxType
+        }
+      }
+    }));
+  };
+
+  const handleRefurbishmentChange = (useType, mapboxType, refurbishment_type) => {
+    const useRows = getRowsForUseTypeAndMapboxType(useType, mapboxType);
+    const detailOptions = uniqueNonEmpty(
+      useRows
+        .filter((row) => getRefurbishmentValue(row) === refurbishment_type)
+        .map((row) => getDetailValue(row))
     );
+    const nextDetail = detailOptions[0] || "";
+    const yearRangeSourceRows = nextDetail
+      ? useRows.filter(
+          (row) =>
+            getRefurbishmentValue(row) === refurbishment_type &&
+            getDetailValue(row) === nextDetail
+        )
+      : [];
+    const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+    const selectedYearRange = yearRangeOptions[0] || null;
 
-  const handleRefurbishmentChange = (useType, refurbishment_type) => {
-    setUseTypeSelections((prev) => {
-      const useRows = getRowsForUseType(useType);
-      const detailOptions = uniqueNonEmpty(
-        useRows
-          .filter((row) => getRefurbishmentValue(row) === refurbishment_type)
-          .map((row) => getDetailValue(row))
-      );
-
-      const nextDetail = detailOptions[0] || "";
-      const yearRangeSourceRows = nextDetail
-        ? useRows.filter(
-            (row) =>
-              getRefurbishmentValue(row) === refurbishment_type &&
-              getDetailValue(row) === nextDetail
-          )
-        : [];
-      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
-      const selectedYearRange = yearRangeOptions[0] || null;
-
-      return {
-        ...prev,
-        [useType]: {
-          refurbishment_type,
-          detail: nextDetail,
-          year_range: selectedYearRange?.value || "",
-          year_start: selectedYearRange?.year_start ?? null,
-          year_end: selectedYearRange?.year_end ?? null
-        }
-      };
+    handleSelectionChange(useType, mapboxType, {
+      refurbishment_type,
+      detail: nextDetail,
+      year_range: selectedYearRange?.value || "",
+      year_start: selectedYearRange?.year_start ?? null,
+      year_end: selectedYearRange?.year_end ?? null
     });
   };
 
-  const handleDetailChange = (useType, detail) => {
-    setUseTypeSelections((prev) => {
-      const refurbishment_type = prev?.[useType]?.refurbishment_type || "";
-      const useRows = getRowsForUseType(useType);
-      const yearRangeSourceRows = refurbishment_type
-        ? useRows.filter(
-            (row) =>
-              getRefurbishmentValue(row) === refurbishment_type &&
-              getDetailValue(row) === detail
-          )
-        : [];
-      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
-      const selectedYearRange = yearRangeOptions[0] || null;
+  const handleDetailChange = (useType, mapboxType, detail) => {
+    const currentRefurbishment = useTypeSelections?.[useType]?.[mapboxType]?.refurbishment_type || "";
+    const useRows = getRowsForUseTypeAndMapboxType(useType, mapboxType);
+    const yearRangeSourceRows = currentRefurbishment
+      ? useRows.filter(
+          (row) =>
+            getRefurbishmentValue(row) === currentRefurbishment &&
+            getDetailValue(row) === detail
+        )
+      : [];
+    const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+    const selectedYearRange = yearRangeOptions[0] || null;
 
-      return {
-        ...prev,
-        [useType]: {
-          ...(prev?.[useType] || {}),
-          detail,
-          year_range: selectedYearRange?.value || "",
-          year_start: selectedYearRange?.year_start ?? null,
-          year_end: selectedYearRange?.year_end ?? null
-        }
-      };
+    handleSelectionChange(useType, mapboxType, {
+      detail,
+      year_range: selectedYearRange?.value || "",
+      year_start: selectedYearRange?.year_start ?? null,
+      year_end: selectedYearRange?.year_end ?? null
     });
   };
 
-  const handleYearRangeChange = (useType, yearRange) => {
-    setUseTypeSelections((prev) => {
-      const current = prev?.[useType] || {};
-      const useRows = getRowsForUseType(useType);
-      const yearRangeSourceRows =
-        current.refurbishment_type && current.detail
-          ? useRows.filter(
-              (row) =>
-                getRefurbishmentValue(row) === current.refurbishment_type &&
-                getDetailValue(row) === current.detail
-            )
-          : [];
-      const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
-      const selectedYearRange =
-        yearRangeOptions.find((option) => option.value === yearRange) || null;
+  const handleYearRangeChange = (useType, mapboxType, yearRange) => {
+    const current = useTypeSelections?.[useType]?.[mapboxType] || {};
+    const useRows = getRowsForUseTypeAndMapboxType(useType, mapboxType);
+    const yearRangeSourceRows =
+      current.refurbishment_type && current.detail
+        ? useRows.filter(
+            (row) =>
+              getRefurbishmentValue(row) === current.refurbishment_type &&
+              getDetailValue(row) === current.detail
+          )
+        : [];
+    const yearRangeOptions = getYearRangeOptions(yearRangeSourceRows);
+    const selectedYearRange =
+      yearRangeOptions.find((option) => option.value === yearRange) || null;
 
-      return {
-        ...prev,
-        [useType]: {
-          ...current,
-          year_range: selectedYearRange?.value || "",
-          year_start: selectedYearRange?.year_start ?? null,
-          year_end: selectedYearRange?.year_end ?? null
-        }
-      };
+    handleSelectionChange(useType, mapboxType, {
+      year_range: selectedYearRange?.value || "",
+      year_start: selectedYearRange?.year_start ?? null,
+      year_end: selectedYearRange?.year_end ?? null
     });
   };
 
@@ -349,110 +452,208 @@ function RightPanel({
                 and detail options.
               </div>
             ) : (
-              areaUseTypes.map((useType) => {
-                const useRows = getRowsForUseType(useType);
-                const refurbOptions = uniqueNonEmpty(
-                  useRows.map((row) => getRefurbishmentValue(row))
-                );
-                const selectedRefurb =
-                  useTypeSelections?.[useType]?.refurbishment_type || "";
-                const detailOptions = uniqueNonEmpty(
-                  (selectedRefurb
-                    ? useRows.filter(
-                        (row) => getRefurbishmentValue(row) === selectedRefurb
-                      )
-                    : useRows
-                  ).map((row) => getDetailValue(row))
-                );
-                const selectedDetail = useTypeSelections?.[useType]?.detail || "";
-                const yearRangeOptions = getYearRangeOptions(
-                  selectedRefurb && selectedDetail
-                    ? useRows.filter(
-                        (row) =>
-                          getRefurbishmentValue(row) === selectedRefurb &&
-                          getDetailValue(row) === selectedDetail
-                      )
-                    : []
-                );
-                const selectedYearRange = useTypeSelections?.[useType]?.year_range || "";
+              <div className="construction-use-panels">
+                {areaUseTypes.map((useType) => {
+                  const isExpanded = expandedUseType === useType;
+                  const mapboxTypes = areaMapboxTypesByUseType[useType] || [];
 
-                return (
-                  <div className="construction-section" key={useType}>
-                    <div className="construction-use-type">Use type: {useType}</div>
+                  return (
+                    <div
+                      className={[
+                        "construction-section",
+                        "construction-type-accordion",
+                        isExpanded ? "is-expanded" : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      key={useType}
+                    >
+                      <button
+                        type="button"
+                        className="construction-type-toggle"
+                        aria-expanded={isExpanded}
+                        aria-controls={`construction-panel-${useType}`}
+                        onClick={() => setExpandedUseType(isExpanded ? "" : useType)}
+                      >
+                        <span className="construction-use-type">Use type: {useType}</span>
+                        <span className="construction-type-caret">{isExpanded ? "▲" : "▼"}</span>
+                      </button>
 
-                    <label
-                      className="construction-field-label"
-                      htmlFor={`refurb-${useType}`}
-                    >
-                      Refurbishment type
-                    </label>
-                    <select
-                      id={`refurb-${useType}`}
-                      className="construction-select"
-                      value={selectedRefurb || ""}
-                      onChange={(e) =>
-                        handleRefurbishmentChange(useType, e.target.value)
-                      }
-                      disabled={!refurbOptions.length}
-                    >
-                      {!refurbOptions.length && (
-                        <option value="">No refurbishment options</option>
+                      {isExpanded && (
+                        <div id={`construction-panel-${useType}`} className="construction-type-body">
+                          <div className="construction-muted construction-mapbox-hint">
+                            {mapboxTypes.length === 1
+                              ? `Mapbox type: ${mapboxTypes[0]}`
+                              : `${mapboxTypes.length} mapbox types in this use type`}
+                          </div>
+
+                          <div className="construction-mapbox-panels">
+                            {mapboxTypes.map((mapboxType) => {
+                              const panelKey = `${useType}::${mapboxType}`;
+                              const isMapboxExpanded = expandedMapboxPanel === panelKey;
+                              const selection = getSelectionFor(useType, mapboxType) || {};
+                              const useRows = getRowsForUseTypeAndMapboxType(useType, mapboxType);
+                              const effectiveRows = useRows.length ? useRows : getRowsForUseType(useType);
+                              const refurbOptions = uniqueNonEmpty(
+                                effectiveRows.map((row) => getRefurbishmentValue(row))
+                              );
+                              const detailOptions = uniqueNonEmpty(
+                                (selection.refurbishment_type
+                                  ? effectiveRows.filter(
+                                      (row) =>
+                                        getRefurbishmentValue(row) === selection.refurbishment_type
+                                    )
+                                  : effectiveRows
+                                ).map((row) => getDetailValue(row))
+                              );
+                              const yearRangeOptions = getYearRangeOptions(
+                                selection.refurbishment_type && selection.detail
+                                  ? effectiveRows.filter(
+                                      (row) =>
+                                        getRefurbishmentValue(row) === selection.refurbishment_type &&
+                                        getDetailValue(row) === selection.detail
+                                    )
+                                  : []
+                              );
+                              const canShowBody = isMapboxExpanded;
+                              const fallbackNotice = !useRows.length
+                                ? "No mapbox-specific rows found; showing use-type defaults."
+                                : null;
+
+                              return (
+                                <div
+                                  key={panelKey}
+                                  className={[
+                                    "construction-subsection",
+                                    isMapboxExpanded ? "is-expanded" : ""
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                >
+                                  <button
+                                    type="button"
+                                    className="construction-subsection-toggle"
+                                    aria-expanded={isMapboxExpanded}
+                                    aria-controls={`construction-subpanel-${panelKey}`}
+                                    onClick={() =>
+                                      setExpandedMapboxPanel(
+                                        isMapboxExpanded ? "" : panelKey
+                                      )
+                                    }
+                                  >
+                                    <span className="construction-subsection-title">
+                                      {mapboxType}
+                                    </span>
+                                    <span className="construction-type-caret">
+                                      {isMapboxExpanded ? "▲" : "▼"}
+                                    </span>
+                                  </button>
+
+                                  {canShowBody && (
+                                    <div
+                                      id={`construction-subpanel-${panelKey}`}
+                                      className="construction-subsection-body"
+                                    >
+                                      {fallbackNotice && (
+                                        <div className="construction-muted construction-fallback-note">
+                                          {fallbackNotice}
+                                        </div>
+                                      )}
+
+                                      <label
+                                        className="construction-field-label"
+                                        htmlFor={`refurb-${panelKey}`}
+                                      >
+                                        Refurbishment type
+                                      </label>
+                                      <select
+                                        id={`refurb-${panelKey}`}
+                                        className="construction-select"
+                                        value={selection.refurbishment_type || ""}
+                                        onChange={(e) =>
+                                          handleRefurbishmentChange(
+                                            useType,
+                                            mapboxType,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={!refurbOptions.length}
+                                      >
+                                        {!refurbOptions.length && (
+                                          <option value="">No refurbishment options</option>
+                                        )}
+                                        {refurbOptions.map((option) => (
+                                          <option key={option} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                      </select>
+
+                                      <label
+                                        className="construction-field-label"
+                                        htmlFor={`detail-${panelKey}`}
+                                      >
+                                        Detail type
+                                      </label>
+                                      <select
+                                        id={`detail-${panelKey}`}
+                                        className="construction-select"
+                                        value={selection.detail || ""}
+                                        onChange={(e) =>
+                                          handleDetailChange(useType, mapboxType, e.target.value)
+                                        }
+                                        disabled={!detailOptions.length}
+                                      >
+                                        {!detailOptions.length && (
+                                          <option value="">No detail options</option>
+                                        )}
+                                        {detailOptions.map((option) => (
+                                          <option key={option} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                      </select>
+
+                                      <label
+                                        className="construction-field-label"
+                                        htmlFor={`year-range-${panelKey}`}
+                                      >
+                                        Year range
+                                      </label>
+                                      <select
+                                        id={`year-range-${panelKey}`}
+                                        className="construction-select"
+                                        value={selection.year_range || ""}
+                                        onChange={(e) =>
+                                          handleYearRangeChange(
+                                            useType,
+                                            mapboxType,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={!yearRangeOptions.length}
+                                      >
+                                        {!yearRangeOptions.length && (
+                                          <option value="">No year range options</option>
+                                        )}
+                                        {yearRangeOptions.map((option) => (
+                                          <option key={option.value} value={option.value}>
+                                            {option.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
-                      {refurbOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label
-                      className="construction-field-label"
-                      htmlFor={`detail-${useType}`}
-                    >
-                      Detail type
-                    </label>
-                    <select
-                      id={`detail-${useType}`}
-                      className="construction-select"
-                      value={selectedDetail || ""}
-                      onChange={(e) => handleDetailChange(useType, e.target.value)}
-                      disabled={!detailOptions.length}
-                    >
-                      {!detailOptions.length && (
-                        <option value="">No detail options</option>
-                      )}
-                      {detailOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label
-                      className="construction-field-label"
-                      htmlFor={`year-range-${useType}`}
-                    >
-                      Year range
-                    </label>
-                    <select
-                      id={`year-range-${useType}`}
-                      className="construction-select"
-                      value={selectedYearRange || ""}
-                      onChange={(e) => handleYearRangeChange(useType, e.target.value)}
-                      disabled={!yearRangeOptions.length}
-                    >
-                      {!yearRangeOptions.length && (
-                        <option value="">No year range options</option>
-                      )}
-                      {yearRangeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
             <button

@@ -61,13 +61,57 @@ function getFeatureStableKey(feature, index = 0) {
   return `geom-${index}-${JSON.stringify(feature?.geometry || {})}`;
 }
 
-function findBestConstructionRow(rows, useType, refurbishmentType, detail, yearStart, yearEnd) {
-  const candidates = rows.filter(
-    (row) =>
-      row?.cea_use_type1 === useType &&
-      row?.refurbishment_type === refurbishmentType &&
-      row?.detail === detail
+function normalizeMapboxType(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getConstructionRowMapboxTypes(row) {
+  const raw = row?.mapbox_type ?? row?.mapboxType ?? row?.mapbox_types ?? row?.mapboxTypes;
+  const values = Array.isArray(raw)
+    ? raw
+    : String(raw || "")
+        .split(/[,;|]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  return Array.from(
+    new Set(values.map((value) => normalizeMapboxType(value)).filter(Boolean))
   );
+}
+
+function findBestConstructionRow(
+  rows,
+  useType,
+  mapboxType,
+  refurbishmentType,
+  detail,
+  yearStart,
+  yearEnd
+) {
+  const strictCandidates = rows.filter(
+    (row) => {
+      const rowMapboxTypes = getConstructionRowMapboxTypes(row);
+      const matchesMapboxType =
+        !mapboxType ||
+        !rowMapboxTypes.length ||
+        rowMapboxTypes.includes(normalizeMapboxType(mapboxType));
+
+      return (
+        row?.cea_use_type1 === useType &&
+        matchesMapboxType &&
+        row?.refurbishment_type === refurbishmentType &&
+        row?.detail === detail
+      );
+    }
+  );
+  const candidates = strictCandidates.length
+    ? strictCandidates
+    : rows.filter(
+        (row) =>
+          row?.cea_use_type1 === useType &&
+          row?.refurbishment_type === refurbishmentType &&
+          row?.detail === detail
+      );
   if (!candidates.length) return null;
 
   const inclusive = candidates.find(
@@ -162,9 +206,13 @@ function App() {
       constructionAreaSelection.buildingKeys.forEach((key, index) => {
         const building = constructionAreaSelection.buildings[index] || {};
         const useType = String(building.cea_use_type1 || "").toUpperCase();
-        const selected = useTypeSelections?.[useType];
+        const mapboxType = normalizeMapboxType(
+          building.mapbox_type || building.type || building.class || building.building
+        );
+        const selected = useTypeSelections?.[useType]?.[mapboxType];
         if (
           !useType ||
+          !mapboxType ||
           !selected?.refurbishment_type ||
           !selected?.detail ||
           !Number.isFinite(selected?.year_start) ||
@@ -176,6 +224,7 @@ function App() {
         const row = findBestConstructionRow(
           constructionMappingRows,
           useType,
+          mapboxType,
           selected.refurbishment_type,
           selected.detail,
           selected.year_start,
@@ -189,6 +238,7 @@ function App() {
           year_end: selected.year_end,
           refurbishment_type: selected.refurbishment_type,
           detail: selected.detail,
+          mapbox_type: mapboxType,
           cea_use_type1: useType
         };
       });
@@ -368,16 +418,14 @@ function App() {
       />
 
       <div className="center-column">
-        {sidebarHidden && (
-          <button
-            type="button"
-            className="sidebar-reopen"
-            aria-label="Show sidebar"
-            onClick={() => setSidebarHidden(false)}
-          >
-            ▶
-          </button>
-        )}
+        <button
+          type="button"
+          className="sidebar-toggle-btn"
+          aria-label={sidebarHidden ? "Show sidebar" : "Hide sidebar"}
+          onClick={() => setSidebarHidden(!sidebarHidden)}
+        >
+          {sidebarHidden ? "▶" : "◀"}
+        </button>
         <MapView
           buildingsGeoJSON={buildingsGeoJSON}
           selectedGeoJSON={selection.selectedGeoJSON}

@@ -2,6 +2,7 @@ const BUILDING_KEY_PRIORITY = [
   "const_type",
   "refurbishment_type",
   "detail",
+  "mapbox_type",
   "feature_year_start",
   "feature_year_end",
   "cea_use_type1",

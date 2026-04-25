@@ -1,0 +1,2935 @@
+{
+  "rows": [
+    {
+      "const_type": "SFH_A",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_B",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_C",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_D",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_G",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_H",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_I",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_J",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_K",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_L",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "MFH_A",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_B",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_C",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_D",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_G",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_H",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_I",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_J",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_K",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_L",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "TH_B",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_C",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_D",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_G",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_H",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_I",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_J",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_K",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_L",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "AB_B",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "standard",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_C",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "standard",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_D",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "standard",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "SFH_A_NR",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_B_NR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_C_NR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_D_NR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_G_NR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_H_NR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_I_NR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_J_NR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_K_NR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_L_NR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "MFH_A_NR",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_B_NR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_C_NR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_D_NR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_G_NR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_H_NR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_I_NR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_J_NR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_K_NR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_L_NR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "TH_B_NR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_C_NR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_D_NR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_G_NR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_H_NR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_I_NR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_J_NR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_K_NR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_L_NR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "AB_B_NR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_C_NR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_D_NR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "SFH_A_AR",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_B_AR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_C_AR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_D_AR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_G_AR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_H_AR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_I_AR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_J_AR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_K_AR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "SFH_L_AR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "single_family_house",
+      "cea_use_type1": "SINGLE_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential"
+      ]
+    },
+    {
+      "const_type": "MFH_A_AR",
+      "year_start": 1000,
+      "year_end": 1859,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_B_AR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_C_AR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_D_AR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_G_AR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_H_AR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_I_AR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_J_AR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_K_AR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH_L_AR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "TH_B_AR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_C_AR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_D_AR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_G_AR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_H_AR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_I_AR",
+      "year_start": 1995,
+      "year_end": 2001,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_J_AR",
+      "year_start": 2002,
+      "year_end": 2009,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_K_AR",
+      "year_start": 2010,
+      "year_end": 2015,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "TH_L_AR",
+      "year_start": 2016,
+      "year_end": 2030,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "terraced_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "terrace",
+        "residential",
+        "house",
+        "bungalow",
+        "detached"
+      ]
+    },
+    {
+      "const_type": "AB_B_AR",
+      "year_start": 1860,
+      "year_end": 1918,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_C_AR",
+      "year_start": 1919,
+      "year_end": 1948,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_D_AR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_D",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "standard",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_E",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "standard",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_G",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_H",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "standard",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_F",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_G",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_D_NR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_E_NR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_G_NR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_H_NR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_F_NR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_G_NR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "normal_refurbishment",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_D_AR",
+      "year_start": 1949,
+      "year_end": 1957,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "MFH-EAST_E_AR",
+      "year_start": 1958,
+      "year_end": 1968,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_multi_family_house",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "house",
+        "bungalow",
+        "cabin",
+        "detached",
+        "houseboat",
+        "residential",
+        "dormitory",
+        "terrace"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_G_AR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "AB-EAST_H_AR",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_apartment_block",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_F_AR",
+      "year_start": 1969,
+      "year_end": 1978,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "HR-EAST_G_AR",
+      "year_start": 1979,
+      "year_end": 1983,
+      "refurbishment_type": "advanced_refurbishment",
+      "detail": "gdr_high_rise",
+      "cea_use_type1": "MULTI_RES",
+      "mapbox_type": [
+        "apartments",
+        "residential",
+        "dormitory"
+      ]
+    },
+    {
+      "const_type": "NWG_BMVBS_A",
+      "year_start": 1000,
+      "year_end": 1976,
+      "refurbishment_type": "standard",
+      "detail": "non_residential_bmvbs",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_BMVBS_B",
+      "year_start": 1977,
+      "year_end": 1983,
+      "refurbishment_type": "standard",
+      "detail": "non_residential_bmvbs",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_BMVBS_C",
+      "year_start": 1984,
+      "year_end": 1994,
+      "refurbishment_type": "standard",
+      "detail": "non_residential_bmvbs",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_BMVBS_D",
+      "year_start": 1995,
+      "year_end": 2020,
+      "refurbishment_type": "standard",
+      "detail": "non_residential_bmvbs",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_1_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "office_administration_government",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic"
+      ]
+    },
+    {
+      "const_type": "NWG_1_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "office_administration_government",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic"
+      ]
+    },
+    {
+      "const_type": "NWG_1_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "office_administration_government",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic"
+      ]
+    },
+    {
+      "const_type": "NWG_2_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "research_university_teaching",
+      "cea_use_type1": "UNIVERSITY",
+      "mapbox_type": [
+        "university",
+        "school",
+        "office"
+      ]
+    },
+    {
+      "const_type": "NWG_2_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "research_university_teaching",
+      "cea_use_type1": "UNIVERSITY",
+      "mapbox_type": [
+        "university",
+        "school",
+        "office"
+      ]
+    },
+    {
+      "const_type": "NWG_2_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "research_university_teaching",
+      "cea_use_type1": "UNIVERSITY",
+      "mapbox_type": [
+        "university",
+        "school",
+        "office"
+      ]
+    },
+    {
+      "const_type": "NWG_3_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "health_care",
+      "cea_use_type1": "HOSPITAL",
+      "mapbox_type": [
+        "hospital",
+        "clinic",
+        "public"
+      ]
+    },
+    {
+      "const_type": "NWG_3_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "health_care",
+      "cea_use_type1": "HOSPITAL",
+      "mapbox_type": [
+        "hospital",
+        "clinic",
+        "public"
+      ]
+    },
+    {
+      "const_type": "NWG_3_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "health_care",
+      "cea_use_type1": "HOSPITAL",
+      "mapbox_type": [
+        "hospital",
+        "clinic",
+        "public"
+      ]
+    },
+    {
+      "const_type": "NWG_4_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "school_day_nursery_care",
+      "cea_use_type1": "SCHOOL",
+      "mapbox_type": [
+        "school",
+        "university",
+        "kindergarten"
+      ]
+    },
+    {
+      "const_type": "NWG_4_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "school_day_nursery_care",
+      "cea_use_type1": "SCHOOL",
+      "mapbox_type": [
+        "school",
+        "university",
+        "kindergarten"
+      ]
+    },
+    {
+      "const_type": "NWG_4_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "school_day_nursery_care",
+      "cea_use_type1": "SCHOOL",
+      "mapbox_type": [
+        "school",
+        "university",
+        "kindergarten"
+      ]
+    },
+    {
+      "const_type": "NWG_5_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "culture_leisure",
+      "cea_use_type1": "MUSEUM",
+      "mapbox_type": [
+        "museum",
+        "religious",
+        "church",
+        "cathedral",
+        "temple",
+        "mosque",
+        "synagogue",
+        "shrine"
+      ]
+    },
+    {
+      "const_type": "NWG_5_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "culture_leisure",
+      "cea_use_type1": "MUSEUM",
+      "mapbox_type": [
+        "museum",
+        "religious",
+        "church",
+        "cathedral",
+        "temple",
+        "mosque",
+        "synagogue",
+        "shrine"
+      ]
+    },
+    {
+      "const_type": "NWG_5_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "culture_leisure",
+      "cea_use_type1": "MUSEUM",
+      "mapbox_type": [
+        "museum",
+        "religious",
+        "church",
+        "cathedral",
+        "temple",
+        "mosque",
+        "synagogue",
+        "shrine"
+      ]
+    },
+    {
+      "const_type": "NWG_6_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "sports_facility",
+      "cea_use_type1": "GYM",
+      "mapbox_type": [
+        "stadium",
+        "sports_hall",
+        "grandstand"
+      ]
+    },
+    {
+      "const_type": "NWG_6_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "sports_facility",
+      "cea_use_type1": "GYM",
+      "mapbox_type": [
+        "stadium",
+        "sports_hall",
+        "grandstand"
+      ]
+    },
+    {
+      "const_type": "NWG_6_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "sports_facility",
+      "cea_use_type1": "GYM",
+      "mapbox_type": [
+        "stadium",
+        "sports_hall",
+        "grandstand"
+      ]
+    },
+    {
+      "const_type": "NWG_7_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "hotel_boarding_restaurant_catering",
+      "cea_use_type1": "HOTEL",
+      "mapbox_type": [
+        "hotel",
+        "restaurant",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_7_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "hotel_boarding_restaurant_catering",
+      "cea_use_type1": "HOTEL",
+      "mapbox_type": [
+        "hotel",
+        "restaurant",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_7_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "hotel_boarding_restaurant_catering",
+      "cea_use_type1": "HOTEL",
+      "mapbox_type": [
+        "hotel",
+        "restaurant",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_8_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "production_workshop_warehouse_operations",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_8_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "production_workshop_warehouse_operations",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_8_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "production_workshop_warehouse_operations",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_9_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "trade_building",
+      "cea_use_type1": "RETAIL",
+      "mapbox_type": [
+        "retail",
+        "supermarket",
+        "kiosk",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_9_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "trade_building",
+      "cea_use_type1": "RETAIL",
+      "mapbox_type": [
+        "retail",
+        "supermarket",
+        "kiosk",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_9_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "trade_building",
+      "cea_use_type1": "RETAIL",
+      "mapbox_type": [
+        "retail",
+        "supermarket",
+        "kiosk",
+        "commercial"
+      ]
+    },
+    {
+      "const_type": "NWG_10_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "technical_utility",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "service",
+        "utility",
+        "warehouse",
+        "transformer_tower",
+        "water_tower"
+      ]
+    },
+    {
+      "const_type": "NWG_10_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "technical_utility",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "service",
+        "utility",
+        "warehouse",
+        "transformer_tower",
+        "water_tower"
+      ]
+    },
+    {
+      "const_type": "NWG_10_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "technical_utility",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "service",
+        "utility",
+        "warehouse",
+        "transformer_tower",
+        "water_tower"
+      ]
+    },
+    {
+      "const_type": "NWG_11_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "transport",
+      "cea_use_type1": "PARKING",
+      "mapbox_type": [
+        "transportation",
+        "train_station",
+        "parking",
+        "garage",
+        "garages",
+        "carport",
+        "roof",
+        "bridge",
+        "hangar",
+        "bunker",
+        "shed",
+        "stable"
+      ]
+    },
+    {
+      "const_type": "NWG_11_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "transport",
+      "cea_use_type1": "PARKING",
+      "mapbox_type": [
+        "transportation",
+        "train_station",
+        "parking",
+        "garage",
+        "garages",
+        "carport",
+        "roof",
+        "bridge",
+        "hangar",
+        "bunker",
+        "shed",
+        "stable"
+      ]
+    },
+    {
+      "const_type": "NWG_11_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "transport",
+      "cea_use_type1": "PARKING",
+      "mapbox_type": [
+        "transportation",
+        "train_station",
+        "parking",
+        "garage",
+        "garages",
+        "carport",
+        "roof",
+        "bridge",
+        "hangar",
+        "bunker",
+        "shed",
+        "stable"
+      ]
+    },
+    {
+      "const_type": "NWG_G1_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "generalized_services_building",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_G1_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "generalized_services_building",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_G1_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "generalized_services_building",
+      "cea_use_type1": "OFFICE",
+      "mapbox_type": [
+        "office",
+        "public",
+        "government",
+        "civic",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_G2_A",
+      "year_start": 1000,
+      "year_end": 1978,
+      "refurbishment_type": "standard",
+      "detail": "generalized_production_building",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_G2_B",
+      "year_start": 1979,
+      "year_end": 2009,
+      "refurbishment_type": "standard",
+      "detail": "generalized_production_building",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    },
+    {
+      "const_type": "NWG_G2_C",
+      "year_start": 2010,
+      "year_end": 2030,
+      "refurbishment_type": "standard",
+      "detail": "generalized_production_building",
+      "cea_use_type1": "INDUSTRIAL",
+      "mapbox_type": [
+        "industrial",
+        "warehouse",
+        "commercial",
+        "service"
+      ]
+    }
+  ]
+}

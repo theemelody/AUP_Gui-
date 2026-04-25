@@ -18,6 +18,34 @@ function readRowValue(row, aliases) {
   return "";
 }
 
+function readRowRawValue(row, aliases) {
+  if (!row || typeof row !== "object") return null;
+  const normalizedAliases = aliases.map((alias) => normalizeKey(alias));
+  for (const [key, value] of Object.entries(row)) {
+    if (normalizedAliases.includes(normalizeKey(key))) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalizeMapboxTypeList(value) {
+  const rawValues = Array.isArray(value)
+    ? value
+    : String(value ?? "")
+        .split(/[,;|]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  return Array.from(
+    new Set(
+      rawValues
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
 function normalizeConstructionMappingRows(payload) {
   const rawRows = Array.isArray(payload)
     ? payload
@@ -44,6 +72,9 @@ function normalizeConstructionMappingRows(payload) {
           "refurbishment"
         ]),
         detail: readRowValue(row, ["detail", "detail_type", "detailType"]),
+        mapbox_type: normalizeMapboxTypeList(
+          readRowRawValue(row, ["mapbox_type", "mapboxType", "mapbox_types", "mapboxTypes"])
+        ),
         cea_use_type1: readRowValue(row, ["cea_use_type1", "ceaUseType1", "use_type"])
           .toUpperCase()
       };
