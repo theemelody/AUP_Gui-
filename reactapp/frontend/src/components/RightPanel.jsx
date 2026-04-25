@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import CollapsiblePanel from "./common/CollapsiblePanel.jsx";
+import LabeledSelectField from "./common/LabeledSelectField.jsx";
+import {
+  getBuildingMapboxType,
+  normalizeMapboxType,
+  normalizeMapboxTypeList
+} from "../utils/selection.js";
 
 function uniqueNonEmpty(values) {
   return Array.from(
@@ -50,26 +57,9 @@ function getDetailValue(row) {
   return getRowValue(row, ["detail", "detail_type", "detailType"]);
 }
 
-function normalizeMapboxType(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getBuildingMapboxType(building) {
-  return normalizeMapboxType(
-    building?.mapbox_type || building?.mapboxType || building?.type || building?.class || building?.building
-  );
-}
-
 function getRowMapboxTypes(row) {
   const raw = row?.mapbox_type ?? row?.mapboxType ?? row?.mapbox_types ?? row?.mapboxTypes;
-  const values = Array.isArray(raw)
-    ? raw
-    : String(raw || "")
-        .split(/[,;|]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-  return uniqueNonEmpty(values.map((value) => normalizeMapboxType(value)));
+  return normalizeMapboxTypeList(raw);
 }
 
 function getYearRangeOptions(rows) {
@@ -94,6 +84,10 @@ function getYearRangeOptions(rows) {
   });
 
   return options.sort((a, b) => a.year_start - b.year_start || a.year_end - b.year_end);
+}
+
+function toSelectOptions(values) {
+  return values.map((value) => ({ value, label: value }));
 }
 
 function buildSelectionFromRows(rows, previousSelection = {}) {
@@ -392,34 +386,21 @@ function RightPanel({
   };
 
   return (
-    <aside
-      className={[
-        "bottom-panel",
-        "bottom-panel-right",
-        rightCollapsed ? "is-collapsed" : ""
-      ]
-        .filter(Boolean)
-        .join(" ")}
+    <CollapsiblePanel
+      positionClass="bottom-panel-right"
+      collapsed={rightCollapsed}
+      setCollapsed={setRightCollapsed}
+      title="Construction type phase"
+      expandAriaLabel="Expand right panel"
+      collapseAriaLabel="Collapse right panel"
     >
-      <div className="bottom-panel-header">
-        <div className="bottom-panel-title">Construction type phase</div>
-        <button
-          type="button"
-          className="bottom-panel-toggle"
-          aria-label={rightCollapsed ? "Expand right panel" : "Collapse right panel"}
-          onClick={() => setRightCollapsed((v) => !v)}
-        >
-          {rightCollapsed ? "▲" : "▼"}
-        </button>
-      </div>
-      <div className="bottom-panel-body">
-        {!constructionPhaseActive ? (
+      {!constructionPhaseActive ? (
           <div className="construction-muted">
             Confirm building selection first. Confirmed buildings will turn orange, then
             you can draw areas and define their construction features.
           </div>
-        ) : (
-          <>
+      ) : (
+        <>
             <div className="construction-status">
               <div>Confirmed buildings: {totalConfirmedBuildings}</div>
               <div>Defined: {definedBuildingCount}</div>
@@ -497,6 +478,7 @@ function RightPanel({
                               const refurbOptions = uniqueNonEmpty(
                                 effectiveRows.map((row) => getRefurbishmentValue(row))
                               );
+                              const refurbSelectOptions = toSelectOptions(refurbOptions);
                               const detailOptions = uniqueNonEmpty(
                                 (selection.refurbishment_type
                                   ? effectiveRows.filter(
@@ -506,6 +488,7 @@ function RightPanel({
                                   : effectiveRows
                                 ).map((row) => getDetailValue(row))
                               );
+                              const detailSelectOptions = toSelectOptions(detailOptions);
                               const yearRangeOptions = getYearRangeOptions(
                                 selection.refurbishment_type && selection.detail
                                   ? effectiveRows.filter(
@@ -560,15 +543,9 @@ function RightPanel({
                                         </div>
                                       )}
 
-                                      <label
-                                        className="construction-field-label"
-                                        htmlFor={`refurb-${panelKey}`}
-                                      >
-                                        Refurbishment type
-                                      </label>
-                                      <select
+                                      <LabeledSelectField
                                         id={`refurb-${panelKey}`}
-                                        className="construction-select"
+                                        label="Refurbishment type"
                                         value={selection.refurbishment_type || ""}
                                         onChange={(e) =>
                                           handleRefurbishmentChange(
@@ -577,52 +554,24 @@ function RightPanel({
                                             e.target.value
                                           )
                                         }
-                                        disabled={!refurbOptions.length}
-                                      >
-                                        {!refurbOptions.length && (
-                                          <option value="">No refurbishment options</option>
-                                        )}
-                                        {refurbOptions.map((option) => (
-                                          <option key={option} value={option}>
-                                            {option}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        options={refurbSelectOptions}
+                                        emptyLabel="No refurbishment options"
+                                      />
 
-                                      <label
-                                        className="construction-field-label"
-                                        htmlFor={`detail-${panelKey}`}
-                                      >
-                                        Detail type
-                                      </label>
-                                      <select
+                                      <LabeledSelectField
                                         id={`detail-${panelKey}`}
-                                        className="construction-select"
+                                        label="Detail type"
                                         value={selection.detail || ""}
                                         onChange={(e) =>
                                           handleDetailChange(useType, mapboxType, e.target.value)
                                         }
-                                        disabled={!detailOptions.length}
-                                      >
-                                        {!detailOptions.length && (
-                                          <option value="">No detail options</option>
-                                        )}
-                                        {detailOptions.map((option) => (
-                                          <option key={option} value={option}>
-                                            {option}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        options={detailSelectOptions}
+                                        emptyLabel="No detail options"
+                                      />
 
-                                      <label
-                                        className="construction-field-label"
-                                        htmlFor={`year-range-${panelKey}`}
-                                      >
-                                        Year range
-                                      </label>
-                                      <select
+                                      <LabeledSelectField
                                         id={`year-range-${panelKey}`}
-                                        className="construction-select"
+                                        label="Year range"
                                         value={selection.year_range || ""}
                                         onChange={(e) =>
                                           handleYearRangeChange(
@@ -631,17 +580,9 @@ function RightPanel({
                                             e.target.value
                                           )
                                         }
-                                        disabled={!yearRangeOptions.length}
-                                      >
-                                        {!yearRangeOptions.length && (
-                                          <option value="">No year range options</option>
-                                        )}
-                                        {yearRangeOptions.map((option) => (
-                                          <option key={option.value} value={option.value}>
-                                            {option.label}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        options={yearRangeOptions}
+                                        emptyLabel="No year range options"
+                                      />
                                     </div>
                                   )}
                                 </div>
@@ -664,10 +605,9 @@ function RightPanel({
             >
               Confirm features
             </button>
-          </>
-        )}
-      </div>
-    </aside>
+        </>
+      )}
+    </CollapsiblePanel>
   );
 }
 

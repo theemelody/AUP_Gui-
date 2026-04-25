@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
-import MapView from "./components/MapView.jsx";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import LeftDock from "./components/LeftDock.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
 import SelectionPanel from "./components/SelectionPanel.jsx";
 import RightPanel from "./components/RightPanel.jsx";
 import {
+  getFeatureStableKey,
+  normalizeMapboxType,
+  normalizeMapboxTypeList,
+  parseGeoJSON
+} from "./utils/selection.js";
+import {
   fetchBuildings,
   fetchConstructionTypeMapping,
   sendChatMessage
 } from "./services/api.js";
+
+const MapView = lazy(() => import("./components/MapView.jsx"));
 
 const USE_MAPBOX_BUILDINGS =
   (import.meta.env.VITE_USE_MAPBOX_BUILDINGS || "true") === "true";
@@ -29,54 +36,9 @@ const INITIAL_CONSTRUCTION_AREA_SELECTION = {
   selectionError: null
 };
 
-function parseSelectedGeoJSON(value) {
-  if (!value) return null;
-  if (typeof value !== "string") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function getFeatureStableKey(feature, index = 0) {
-  const props = feature?.properties || {};
-  const explicitKey = props.__selection_key;
-  if (explicitKey) return String(explicitKey);
-
-  const candidates = [
-    feature?.id,
-    props.id,
-    props.osm_id,
-    props.osm_way_id,
-    props.mapbox_id
-  ];
-
-  for (const value of candidates) {
-    if (value !== null && value !== undefined && value !== "") {
-      return String(value);
-    }
-  }
-
-  return `geom-${index}-${JSON.stringify(feature?.geometry || {})}`;
-}
-
-function normalizeMapboxType(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
 function getConstructionRowMapboxTypes(row) {
   const raw = row?.mapbox_type ?? row?.mapboxType ?? row?.mapbox_types ?? row?.mapboxTypes;
-  const values = Array.isArray(raw)
-    ? raw
-    : String(raw || "")
-        .split(/[,;|]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-  return Array.from(
-    new Set(values.map((value) => normalizeMapboxType(value)).filter(Boolean))
-  );
+  return normalizeMapboxTypeList(raw);
 }
 
 function findBestConstructionRow(
@@ -163,7 +125,7 @@ function App() {
     // Normalize backend and frontend selection payloads into one app state shape.
     setSelection({
       count: result?.count || 0,
-      selectedGeoJSON: parseSelectedGeoJSON(result?.selected_geojson),
+      selectedGeoJSON: parseGeoJSON(result?.selected_geojson),
       zipBase64: result?.zip_base64 || null,
       buildings: Array.isArray(result?.buildings) ? result.buildings : [],
       selectionError: result?.selection_error || null
@@ -189,7 +151,7 @@ function App() {
   const handleConstructionAreaSelection = useCallback((result) => {
     setConstructionAreaSelection({
       count: result?.count || 0,
-      selectedGeoJSON: parseSelectedGeoJSON(result?.selected_geojson),
+      selectedGeoJSON: parseGeoJSON(result?.selected_geojson),
       buildings: Array.isArray(result?.buildings) ? result.buildings : [],
       buildingKeys: Array.isArray(result?.building_keys) ? result.building_keys : [],
       selectionError: result?.selection_error || null
@@ -339,7 +301,7 @@ function App() {
     };
   }, []);
 
-  const confirmedFeatureCollection = parseSelectedGeoJSON(
+  const confirmedFeatureCollection = parseGeoJSON(
     confirmedSelection?.selectedGeoJSON
   );
 
@@ -426,15 +388,23 @@ function App() {
         >
           {sidebarHidden ? "▶" : "◀"}
         </button>
-        <MapView
-          buildingsGeoJSON={buildingsGeoJSON}
-          selectedGeoJSON={selection.selectedGeoJSON}
-          lockedSelectionGeoJSON={lockedSelectionGeoJSONWithState}
-          selectionLocked={Boolean(confirmedSelection)}
-          constructionPhaseActive={Boolean(confirmedSelection)}
-          onSelection={handleSelection}
-          onConstructionAreaSelection={handleConstructionAreaSelection}
-        />
+        <Suspense
+          fallback={
+            <div className="map-overlay" style={{ position: "absolute", left: 12, top: 12 }}>
+              Loading map...
+            </div>
+          }
+        >
+          <MapView
+            buildingsGeoJSON={buildingsGeoJSON}
+            selectedGeoJSON={selection.selectedGeoJSON}
+            lockedSelectionGeoJSON={lockedSelectionGeoJSONWithState}
+            selectionLocked={Boolean(confirmedSelection)}
+            constructionPhaseActive={Boolean(confirmedSelection)}
+            onSelection={handleSelection}
+            onConstructionAreaSelection={handleConstructionAreaSelection}
+          />
+        </Suspense>
         {loadError && (
           <div
             className="map-overlay map-overlay-error"

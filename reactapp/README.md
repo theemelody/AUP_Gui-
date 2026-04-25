@@ -23,26 +23,44 @@ Main files in `frontend/src/`:
 
 - `main.jsx`
   - App bootstrap and global stylesheet imports.
+
 - `App.jsx`
   - Top-level state container and composition layer.
   - Owns selection state, confirmation workflow, chat state, and scenario state.
+  - Lazy-loads `MapView` to keep the main app chunk lighter.
   - Passes data and callbacks into smaller feature components.
+
 - `components/LeftDock.jsx`
   - Left sidebar for model info, scenario controls, saved scenarios, and simulation actions.
+
 - `components/ChatPanel.jsx`
   - Floating chat panel for Ollama conversation and panel collapse behavior.
+
 - `components/SelectionPanel.jsx`
   - Bottom-center selected buildings panel with confirm/reset actions and building cards.
+
 - `components/RightPanel.jsx`
   - Right floating panel for construction-type feature definition.
-  - Shows year range and use-type-filtered refurbishment/detail options for area-selected confirmed buildings.
+  - Shows use-type and mapbox-type filtered refurbishment/detail/year-range options for area-selected confirmed buildings.
+
 - `components/MapView.jsx`
   - Map rendering and draw interaction.
   - Performs frontend-side selection against Mapbox `building` features.
   - Applies mapping (`mapbox_type` -> `cea_use_type1`) and basic feature enrichment.
   - Renders confirmation state colors for selected buildings during construction phase.
+
+- `components/common/`
+  - Shared UI primitives used across features.
+  - `CollapsiblePanel.jsx`: reusable shell for floating left/right bottom panels.
+  - `LabeledSelectField.jsx`: reusable labeled select control for configuration forms.
+  - `LeftDockTab.jsx`: reusable tab wrapper for left-dock accordion sections.
+
 - `services/api.js`
   - API client wrappers for backend endpoints.
+
+- `utils/selection.js`
+  - Shared selection/mapbox helpers (GeoJSON parsing, stable feature keys, mapbox type normalization).
+
 - `index.css`
   - Global layout + component styles.
 
@@ -66,26 +84,15 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
 ## Current Selection Workflow
 
 1. User draws polygon(s) on the map.
-2. Frontend reads Mapbox building features from the basemap.
-3. Turf intersection computes selected building subset.
-4. Frontend enriches building data:
-   - normalized `height` / `min_height`
-   - `estimated_floors`
-   - mapped `cea_use_type1`
-5. User clicks Confirm selection:
-  - confirmed set remains visible in orange (pending feature definition)
-  - construction phase is enabled
-6. User draws area(s) over confirmed buildings during construction phase.
-7. Right panel shows options filtered to the area-selected building use types:
-  - year range (1800 to 2030)
-  - refurbishment type
-  - detail type
-8. User clicks Confirm features:
-  - matching `const_type` is assigned per selected building
-  - defined buildings turn yellow
-9. When all confirmed buildings are defined:
-  - all confirmed buildings turn green
-10. User can click Reset selection to return to initial drawing mode.
+1. Frontend reads Mapbox building features from the basemap.
+1. Turf intersection computes the selected building subset.
+1. Frontend enriches building data with normalized `height` / `min_height`, `estimated_floors`, and mapped `cea_use_type1`.
+1. User clicks Confirm selection; confirmed buildings remain orange (pending), and construction phase is enabled.
+1. User draws area(s) over confirmed buildings during construction phase.
+1. Right panel shows options filtered by area-selected building use types and mapbox types, including refurbishment, detail, and year range (dynamic from mapping rows).
+1. User clicks Confirm features; matching `const_type` is assigned per selected building, and defined buildings turn yellow.
+1. When all confirmed buildings are defined, all confirmed buildings turn green.
+1. User can click Reset selection to return to initial drawing mode.
 
 ## Mapping Workflow
 
@@ -143,7 +150,9 @@ Frontend (`frontend/.env` if needed):
 
 ## Development Notes
 
-- Frontend build currently succeeds with a non-blocking chunk-size warning from Mapbox bundles.
+- Frontend build succeeds cleanly.
+- `MapView` is lazy-loaded, so map dependencies are split from the main app chunk.
+- The Mapbox vendor chunk is still large by nature; `vite.config.js` sets `build.chunkSizeWarningLimit` to avoid noisy false-positive warnings for this expected chunk.
 - If backend imports appear unresolved in editor diagnostics, ensure the Python interpreter is set to `reactapp/.venv`.
 - Keep mapping CSVs as source-of-truth where possible; avoid hardcoding category logic in components.
 - The UI is intentionally split into feature components so `App.jsx` stays as the orchestration layer instead of a large monolithic page file.

@@ -8,6 +8,7 @@ import Map, {
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import booleanIntersects from "@turf/boolean-intersects";
 import { fetchMapboxCeaUseTypeMapping } from "../services/api.js";
+import { getFeatureStableKey, parseGeoJSON } from "../utils/selection.js";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -64,19 +65,6 @@ function inferCeaUseType1(properties, mapboxType) {
   }
 
   return null;
-}
-
-function normalizeGeoJSON(value) {
-  // Accept either already-parsed GeoJSON or serialized JSON strings.
-  if (!value) return null;
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-  return value;
 }
 
 function estimateFloors(properties) {
@@ -170,27 +158,6 @@ function normalizeMapboxFeature(feature, mapping, index = 0) {
       estimated_floors: estimateFloors(properties)
     }
   };
-}
-
-function getFeatureStableKey(feature, index = 0) {
-  const props = feature?.properties || {};
-  const explicitKey = props.__selection_key;
-  if (explicitKey) return String(explicitKey);
-
-  const candidates = [
-    feature?.id,
-    props.id,
-    props.osm_id,
-    props.osm_way_id,
-    props.mapbox_id
-  ];
-  for (const value of candidates) {
-    if (value !== null && value !== undefined && value !== "") {
-      return String(value);
-    }
-  }
-
-  return `geom-${index}-${JSON.stringify(feature?.geometry || {})}`;
 }
 
 function selectBuildingsFromMapbox(map, geometry, mapping) {
@@ -432,15 +399,15 @@ function MapView({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   const geojson = useMemo(
-    () => normalizeGeoJSON(buildingsGeoJSON),
+    () => parseGeoJSON(buildingsGeoJSON),
     [buildingsGeoJSON]
   );
   const normalizedSelectedGeoJSON = useMemo(
-    () => normalizeGeoJSON(selectedGeoJSON),
+    () => parseGeoJSON(selectedGeoJSON),
     [selectedGeoJSON]
   );
   const normalizedLockedSelectionGeoJSON = useMemo(
-    () => normalizeGeoJSON(lockedSelectionGeoJSON),
+    () => parseGeoJSON(lockedSelectionGeoJSON),
     [lockedSelectionGeoJSON]
   );
   const hasFittedRef = useRef(false);

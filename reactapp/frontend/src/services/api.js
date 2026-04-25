@@ -1,3 +1,5 @@
+import { normalizeMapboxTypeList } from "../utils/selection.js";
+
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 function normalizeKey(value) {
@@ -27,23 +29,6 @@ function readRowRawValue(row, aliases) {
     }
   }
   return null;
-}
-
-function normalizeMapboxTypeList(value) {
-  const rawValues = Array.isArray(value)
-    ? value
-    : String(value ?? "")
-        .split(/[,;|]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-  return Array.from(
-    new Set(
-      rawValues
-        .map((item) => String(item || "").trim().toLowerCase())
-        .filter(Boolean)
-    )
-  );
 }
 
 function normalizeConstructionMappingRows(payload) {
