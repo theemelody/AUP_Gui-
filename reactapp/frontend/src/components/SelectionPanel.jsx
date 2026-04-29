@@ -1,3 +1,6 @@
+import React from "react";
+import { Collapse } from "react-collapse";
+
 const BUILDING_KEY_PRIORITY = [
   "const_type",
   "refurbishment_type",
@@ -30,10 +33,23 @@ function SelectionPanel({
   confirmedSelection,
   activeSelection,
   handleConfirmSelection,
-  handleResetSelection
+  handleResetSelection,
+  handleExportCeaShp
 }) {
+
+  const [isOpened, setIsOpened] = React.useState(false); 
+
+  const toggleCollapse = () => {
+    setIsOpened(!isOpened)
+  }
   return (
     <section className="selected-list-panel" aria-label="Selected buildings">
+      <div>
+        <button onClick={toggleCollapse} type="button" className="action-link">
+          {isOpened ? "hide selected Buildings": "Show selected Buildings"}
+        </button>
+      </div>
+      <Collapse isOpened={isOpened}>
       <div className="selected-list-header">
         <div className="selected-list-title">
           {confirmedSelection
@@ -42,21 +58,37 @@ function SelectionPanel({
         </div>
         <div className="selected-list-actions">
           {confirmedSelection ? (
-            <button type="button" className="action-link" onClick={handleResetSelection}>
-              Reset selection
-            </button>
+            <>
+              <button type="button" className="action-link" onClick={handleExportCeaShp}>
+                Export CEA SHP
+              </button>
+              <button type="button" className="action-link" onClick={handleResetSelection}>
+                Reset selection
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              className="action-link"
-              onClick={handleConfirmSelection}
-              disabled={!selection.count || !selection.selectedGeoJSON}
-            >
-              Confirm selection
-            </button>
+            <>
+              <button
+                type="button"
+                className="action-link"
+                onClick={handleExportCeaShp}
+                disabled={!selection.count || !selection.selectedGeoJSON}
+              >
+                Export CEA SHP
+              </button>
+              <button
+                type="button"
+                className="action-link"
+                onClick={handleConfirmSelection}
+                disabled={!selection.count || !selection.selectedGeoJSON}
+              >
+                Confirm selection
+              </button>
+            </>
           )}
         </div>
       </div>
+      
 
       <div className="selected-list-body">
         {selection.selectionError && !confirmedSelection && (
@@ -88,6 +120,7 @@ function SelectionPanel({
           ))
         )}
       </div>
+      </Collapse>
     </section>
   );
 }

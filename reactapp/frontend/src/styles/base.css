@@ -1,0 +1,33 @@
+/* === BASE & GLOBAL STYLES === */
+
+html,
+body,
+#root {
+  /* Make the app fill the viewport for map-first layout. */
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* Default font stack for dashboard and map controls. */
+  font-family: var(--font-stack);
+}
+
+/* Remove default button styles for custom styling */
+button {
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Ensure inputs reset to base sizing */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}

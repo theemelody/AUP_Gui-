@@ -12,6 +12,8 @@ import {
 import {
   fetchBuildings,
   fetchConstructionTypeMapping,
+  downloadBase64Zip,
+  exportCeaShapefile,
   sendChatMessage
 } from "./services/api.js";
 
@@ -109,6 +111,7 @@ function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
   const [scenarioName, setScenarioName] = useState("");
+  const [confirmedScenarioName, setConfirmedScenarioName] = useState("");
   const [savedScenarios, setSavedScenarios] = useState([
     "munich-commercial-scenario"
   ]);
@@ -213,6 +216,23 @@ function App() {
     [constructionAreaSelection, constructionMappingRows]
   );
 
+  const handleExportCeaShp = useCallback(async () => {
+    const targetSelection = confirmedSelection || selection;
+    const selectedGeoJSON = targetSelection?.selectedGeoJSON;
+    if (!selectedGeoJSON || targetSelection.count <= 0) return;
+    const activeScenarioName = confirmedScenarioName || scenarioName.trim();
+
+    try {
+      const result = await exportCeaShapefile(selectedGeoJSON, activeScenarioName);
+      if (!result?.zip_base64) {
+        throw new Error("CEA export did not return a shapefile ZIP");
+      }
+      downloadBase64Zip(result.zip_base64, result.filename || "cea_selected_buildings.zip");
+    } catch (e) {
+      alert(e?.message || "CEA export failed");
+    }
+  }, [confirmedScenarioName, confirmedSelection, scenarioName, selection]);
+
   const runSimulation = useCallback(() => {
     // Run against confirmed selection when present, otherwise current draft selection.
     const targetSelection = confirmedSelection || selection;
@@ -249,8 +269,14 @@ function App() {
     setSavedScenarios((prev) =>
       prev.includes(name) ? prev : [name, ...prev].slice(0, 8)
     );
-    setScenarioName("");
+    setScenarioName(name);
+    setConfirmedScenarioName(name);
   }, [scenarioName]);
+
+  const activeScenarioName = confirmedScenarioName || scenarioName.trim();
+  const activeScenarioPath = activeScenarioName
+    ? `scenarios/${activeScenarioName}-scenario`
+    : "";
 
   useEffect(() => {
     // In SHP mode, preload all buildings from the backend once.
@@ -374,6 +400,7 @@ function App() {
         setScenarioName={setScenarioName}
         handleSaveScenario={handleSaveScenario}
         savedScenarios={savedScenarios}
+        scenarioPath={activeScenarioPath}
         hasSelection={hasSelection}
         runSimulation={runSimulation}
         setSidebarHidden={setSidebarHidden}
@@ -441,6 +468,7 @@ function App() {
           activeSelection={activeSelection}
           handleConfirmSelection={handleConfirmSelection}
           handleResetSelection={handleResetSelection}
+          handleExportCeaShp={handleExportCeaShp}
         />
 
         <RightPanel

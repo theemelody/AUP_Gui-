@@ -1,0 +1,41 @@
+/* === MAIN LAYOUT & GRID === */
+
+.app-root {
+  /* Two-column shell: left dock + full-height interactive map area. */
+  display: grid;
+  grid-template-columns: var(--dock-width) 1fr;
+  height: 100%;
+}
+
+.app-root.sidebar-hidden {
+  --dock-width: 0px;
+}
+
+.center-column {
+  position: relative;
+}
+
+.map-container {
+  position: absolute;
+  inset: 0;
+}
+
+.sidebar-toggle-btn {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  z-index: 7;
+  width: 30px;
+  height: 44px;
+  border-radius: 0px 5px 5px 0px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.95);
+  color: #e2e8f0;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left var(--transition-fast);
+}

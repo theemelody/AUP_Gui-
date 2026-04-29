@@ -46,6 +46,7 @@ Main files in `frontend/src/`:
 - `components/MapView.jsx`
   - Map rendering and draw interaction.
   - Performs frontend-side selection against Mapbox `building` features.
+  - Resolves Mapbox building-part features by looking up parent building type via shared `building_id` field.
   - Applies mapping (`mapbox_type` -> `cea_use_type1`) and basic feature enrichment.
   - Renders confirmation state colors for selected buildings during construction phase.
 
@@ -74,6 +75,9 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
   - Returns shapefile buildings as GeoJSON.
 - `POST /api/select`
   - Backend selection endpoint based on drawn geometry (SHP workflow).
+- `POST /api/export-cea-shp`
+  - Converts selected Mapbox GeoJSON into a CEA-compatible shapefile ZIP.
+  - Enriches selected buildings with reverse-geocoded address fields when available.
 - `GET /api/mapbox-cea-use-type-mapping`
   - Serves CSV-based mapping for frontend selection.
 - `GET /api/construction-type-mapping`
@@ -86,7 +90,14 @@ For a more detailed component-by-component explanation, see [frontend/src/compon
 1. User draws polygon(s) on the map.
 1. Frontend reads Mapbox building features from the basemap.
 1. Turf intersection computes the selected building subset.
+1. **Building-part resolution**: Features with `type="building:part"` are enriched by looking up their parent building's type via the shared `building_id` field, ensuring consistent use-type classification.
 1. Frontend enriches building data with normalized `height` / `min_height`, `estimated_floors`, and mapped `cea_use_type1`.
+1. User can export the selection to a CEA-ready shapefile ZIP:
+   - Selected buildings are converted to CEA-compatible polygons with validated attributes.
+   - Address data is reverse-geocoded from Mapbox; falls back to OSM if unavailable.
+   - Streets, postal codes, and name/number fields are populated from geocoding responses.
+   - Generated `zone.shp` contains individual selected buildings; `site.shp` contains the merged union.
+   - ZIP includes all required CEA schema columns (`name`, `floors_ag`, `floors_bg`, `height_ag`, `height_bg`, `use_type1`, `use_type2`, `use_type3`, `construction_type`, `year`, address fields).
 1. User clicks Confirm selection; confirmed buildings remain orange (pending), and construction phase is enabled.
 1. User draws area(s) over confirmed buildings during construction phase.
 1. Right panel shows options filtered by area-selected building use types and mapbox types, including refurbishment, detail, and year range (dynamic from mapping rows).
@@ -157,3 +168,24 @@ Frontend (`frontend/.env` if needed):
 - Keep mapping CSVs as source-of-truth where possible; avoid hardcoding category logic in components.
 - The UI is intentionally split into feature components so `App.jsx` stays as the orchestration layer instead of a large monolithic page file.
 - The construction mapping parser is resilient to CSV header variations (BOM / key-format differences) and normalizes rows before frontend use.
+
+## Recent Updates
+
+### Building-Part Type Resolution (v2.0)
+
+- **Problem**: Mapbox building-part features (geometrically subdivided portions of larger buildings) were being marked as "unknown" use type.
+- **Solution**: Implemented parent-building lookup using Mapbox's `building_id` field:
+  - Building parts have a numeric `building_id` property pointing to their parent building's `id`.
+  - Parent buildings contain the authoritative building use type in the `type` field.
+  - Both frontend (`MapView.jsx`) and backend (`reactapp.py`) now perform parent-type resolution before CEA classification.
+  - Helper functions: `buildBuildingTypeLookup()` (frontend), `build_building_type_lookup_from_features()` (backend).
+
+### CEA Export Pipeline Enhancements (v2.0)
+
+- **Reverse Geocoding**: Selected buildings are now enriched with address data via Mapbox Reverse Geocoding API, with OSM fallback.
+- **Shapefile ZIP Generation**: Exports include both `zone.shp` (individual selected buildings) and `site.shp` (merged union).
+- **CEA Schema Validation**: All required columns are populated with sensible defaults:
+  - Use types inferred from Mapbox building category or height heuristics.
+  - Floor counts estimated from OSM data or height approximations.
+  - Construction types available for post-selection refinement in the construction phase.
+- **Auditability**: Raw Mapbox types are preserved in `mapbox_type_raw` for debugging and validation.

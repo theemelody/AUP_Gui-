@@ -1,0 +1,185 @@
+/* === CONSTRUCTION PHASE PANEL (RIGHT PANEL) === */
+
+.construction-status {
+  display: grid;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-light-text);
+}
+
+.status-complete {
+  color: var(--color-status-complete);
+  font-weight: 700;
+}
+
+.status-pending {
+  color: var(--color-status-pending);
+  font-weight: 700;
+}
+
+/* Sections */
+
+.construction-section {
+  border: 1px solid var(--color-light-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.construction-label {
+  font-weight: 700;
+  color: var(--color-light-text);
+  margin-bottom: var(--spacing-sm);
+  font-size: 13px;
+}
+
+.construction-use-type {
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+/* Scrollable container */
+
+.construction-use-panels {
+  max-height: min(44vh, 420px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+/* Accordion */
+
+.construction-type-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.construction-type-toggle {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+  cursor: pointer;
+  text-align: left;
+}
+
+.construction-type-accordion .construction-use-type {
+  margin-bottom: 0;
+}
+
+.construction-type-caret {
+  font-size: var(--font-size-xs);
+  color: var(--color-light-text-subtle);
+}
+
+.construction-type-body {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  padding: var(--spacing-md);
+}
+
+.construction-mapbox-hint {
+  margin-bottom: var(--spacing-md);
+}
+
+.construction-mapbox-panels {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+/* Subsections */
+
+.construction-subsection {
+  border: 1px solid var(--color-light-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.58);
+  overflow: hidden;
+}
+
+.construction-subsection-toggle {
+  width: 100%;
+  border: none;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--color-light-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-lg);
+  cursor: pointer;
+  text-align: left;
+  font-weight: 700;
+}
+
+.construction-subsection-body {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  padding: var(--spacing-lg);
+}
+
+.construction-subsection-title {
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.construction-fallback-note {
+  margin-bottom: var(--spacing-md);
+}
+
+.construction-muted {
+  color: var(--color-light-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
+.construction-error {
+  margin-top: var(--spacing-md);
+  color: #7f1d1d;
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-error-light);
+  border: 1px solid var(--color-border-error);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* Form Groups & Fields */
+
+.construction-range-group {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.construction-range-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-light-text-subtle);
+  font-weight: 600;
+}
+
+.construction-field-label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-light-text-subtle);
+  font-weight: 600;
+}
+
+.construction-select {
+  width: 100%;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--color-light-border-strong);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-light-text);
+  padding: 0 var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.construction-confirm-btn {
+  width: 100%;
+}

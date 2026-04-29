@@ -1,0 +1,79 @@
+/* === COMMON COMPONENTS & UTILITIES === */
+
+/* Action Links */
+
+.action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-light-border);
+  background: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  color: var(--color-light-text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  transition: background 180ms ease;
+}
+
+.action-link:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.action-link.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Action Buttons */
+
+.action-button {
+  height: 34px;
+  padding: 0 var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-light-border);
+  background: rgba(15, 23, 42, 0.88);
+  color: white;
+  font-weight: 750;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.action-button:hover {
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Status Indicator */
+
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.success {
+  background: var(--color-status-success);
+}
+
+.status-indicator.error {
+  background: var(--color-status-error);
+}
+
+.status-indicator.warning {
+  background: var(--color-status-warning);
+}
+
+.status-indicator.info {
+  background: var(--color-status-info);
+}

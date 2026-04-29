@@ -7,6 +7,7 @@ function LeftDock({
   setScenarioName,
   handleSaveScenario,
   savedScenarios,
+  scenarioPath,
   hasSelection,
   runSimulation
 }) {
@@ -42,6 +43,7 @@ function LeftDock({
           <div className="left-dock-section">
             <div className="left-dock-section-title">Simulation Settings</div>
             <div className="left-dock-field">/home/user/automatic-urban-planner</div>
+            {scenarioPath ? <div className="left-dock-muted">{scenarioPath}</div> : null}
           </div>
 
           <div className="left-dock-section">

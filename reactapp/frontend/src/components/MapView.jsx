@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
-import Map, {
+import MapComponent, {
   FullscreenControl,
   NavigationControl,
   Source,
@@ -32,6 +32,37 @@ function getMapboxBuildingType(properties) {
     .trim()
     .toLowerCase();
   return fallback || null;
+}
+
+function getBuildingFeatureKey(feature) {
+  const properties = feature?.properties || {};
+  const buildingId = properties?.building_id ?? properties?.buildingId;
+  if (buildingId !== null && buildingId !== undefined && buildingId !== "") {
+    return String(buildingId);
+  }
+
+  if (feature?.id !== null && feature?.id !== undefined && feature?.id !== "") {
+    return String(feature.id);
+  }
+
+  return null;
+}
+
+function buildBuildingTypeLookup(features) {
+  const lookup = new Map();
+
+  for (const feature of features) {
+    const properties = feature?.properties || {};
+    const mapboxType = getMapboxBuildingType(properties);
+    const featureKey = getBuildingFeatureKey(feature);
+    if (!featureKey) continue;
+
+    if (mapboxType && mapboxType !== "building" && mapboxType !== "building:part") {
+      lookup.set(featureKey, mapboxType);
+    }
+  }
+
+  return lookup;
 }
 
 function mapToCeaUseType1(mapboxType, mapping) {
@@ -133,11 +164,15 @@ function normalizeMapboxFeature(feature, mapping, index = 0) {
   const properties = feature?.properties || {};
   const height = Number(properties.height);
   const minHeight = Number(properties.min_height ?? 0);
-  const mapboxType = getMapboxBuildingType(properties);
+  const rawMapboxType = getMapboxBuildingType(properties);
+  const resolvedMapboxType =
+    rawMapboxType && rawMapboxType !== "building" && rawMapboxType !== "building:part"
+      ? rawMapboxType
+      : null;
   const mappedUseType =
-    mapToCeaUseType1(mapboxType, mapping) ||
+    mapToCeaUseType1(resolvedMapboxType || rawMapboxType, mapping) ||
     String(properties?.cea_use_type1 || "").trim().toUpperCase() ||
-    inferCeaUseType1(properties, mapboxType) ||
+    inferCeaUseType1(properties, resolvedMapboxType || rawMapboxType) ||
     "UNKNOWN";
   const stableKey = getFeatureStableKey(feature, index);
   const geometry = toPlainGeometry(feature?.geometry);
@@ -151,7 +186,8 @@ function normalizeMapboxFeature(feature, mapping, index = 0) {
     properties: {
       ...properties,
       __selection_key: stableKey,
-      mapbox_type: mapboxType,
+      mapbox_type: resolvedMapboxType || rawMapboxType,
+      mapbox_type_raw: rawMapboxType,
       cea_use_type1: mappedUseType,
       height: Number.isFinite(height) ? height : null,
       min_height: Number.isFinite(minHeight) ? minHeight : 0,
@@ -187,8 +223,35 @@ function selectBuildingsFromMapbox(map, geometry, mapping) {
     });
   });
 
+  const typeLookup = buildBuildingTypeLookup(selectedFeatures);
   const normalizedFeatures = selectedFeatures
-    .map((feature, index) => normalizeMapboxFeature(feature, mapping, index))
+    .map((feature, index) => {
+      const normalizedFeature = normalizeMapboxFeature(feature, mapping, index);
+      if (!normalizedFeature) return null;
+
+      const featureKey = getBuildingFeatureKey(feature);
+      const resolvedType =
+        (featureKey && typeLookup.get(featureKey)) ||
+        normalizedFeature.properties?.mapbox_type ||
+        null;
+
+      if (
+        resolvedType &&
+        resolvedType !== normalizedFeature.properties.mapbox_type &&
+        (normalizedFeature.properties.mapbox_type === "building:part" ||
+          normalizedFeature.properties.mapbox_type === "building" ||
+          !normalizedFeature.properties.mapbox_type)
+      ) {
+        normalizedFeature.properties.mapbox_type = resolvedType;
+        normalizedFeature.properties.cea_use_type1 =
+          mapToCeaUseType1(resolvedType, mapping) ||
+          String(normalizedFeature.properties?.cea_use_type1 || "").trim().toUpperCase() ||
+          inferCeaUseType1(normalizedFeature.properties, resolvedType) ||
+          normalizedFeature.properties.cea_use_type1;
+      }
+
+      return normalizedFeature;
+    })
     .filter(Boolean);
 
   const buildings = normalizedFeatures.map((feature) => feature.properties || {});
@@ -748,7 +811,7 @@ function MapView({
 
   return (
     <div className="map-container">
-      <Map
+      <MapComponent
         ref={mapRef}
         {...viewState}
         onLoad={handleMapLoad}
@@ -780,7 +843,7 @@ function MapView({
             <Layer {...lockedOutlineLayer} />
           </Source>
         )}
-      </Map>
+      </MapComponent>
     </div>
   );
 }

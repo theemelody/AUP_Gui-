@@ -148,6 +148,51 @@ export async function selectBuildings(geometry, { signal } = {}) {
   return res.json();
 }
 
+export async function exportCeaShapefile(selectedGeoJSON, scenarioName = "") {
+  // Converts selected Mapbox GeoJSON into a projected, CEA-compatible shapefile ZIP.
+  const res = await fetch(`${API_BASE}/export-cea-shp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ selected_geojson: selectedGeoJSON, scenario_name: scenarioName })
+  });
+  if (!res.ok) {
+    let detail = `CEA export request failed (${res.status})`;
+    try {
+      const data = await res.json();
+      detail = data?.detail || detail;
+    } catch {
+      // Keep fallback detail message.
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+export function downloadBase64Zip(zipBase64, filename = "cea_selected_buildings.zip") {
+  if (!zipBase64) {
+    throw new Error("Missing ZIP payload")
+  }
+
+  const binary = atob(zipBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  const blob = new Blob([bytes], { type: "application/zip" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function sendChatMessage(message) {
   // Sends chat input to backend, which proxies to Ollama and returns model reply.
   const res = await fetch(`${API_BASE}/chat`, {
