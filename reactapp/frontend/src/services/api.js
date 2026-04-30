@@ -148,14 +148,19 @@ export async function selectBuildings(geometry, { signal } = {}) {
   return res.json();
 }
 
-export async function exportCeaShapefile(selectedGeoJSON, scenarioName = "") {
+export async function exportCeaShapefile(selectedGeoJSON, scenarioName = "", drawnPolygon = null) {
   // Converts selected Mapbox GeoJSON into a projected, CEA-compatible shapefile ZIP.
+  // drawnPolygon is the area selection boundary to use for site.shp
   const res = await fetch(`${API_BASE}/export-cea-shp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ selected_geojson: selectedGeoJSON, scenario_name: scenarioName })
+    body: JSON.stringify({
+      selected_geojson: selectedGeoJSON,
+      scenario_name: scenarioName,
+      site_polygon: drawnPolygon
+    })
   });
   if (!res.ok) {
     let detail = `CEA export request failed (${res.status})`;

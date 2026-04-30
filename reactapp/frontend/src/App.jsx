@@ -123,6 +123,7 @@ function App() {
     INITIAL_CONSTRUCTION_AREA_SELECTION
   );
   const [buildingAssignments, setBuildingAssignments] = useState({});
+  const [drawnPolygon, setDrawnPolygon] = useState(null);
 
   const handleSelection = useCallback((result) => {
     // Normalize backend and frontend selection payloads into one app state shape.
@@ -133,6 +134,10 @@ function App() {
       buildings: Array.isArray(result?.buildings) ? result.buildings : [],
       selectionError: result?.selection_error || null
     });
+    // Capture the drawn polygon from the selection result
+    if (result?.drawn_polygon) {
+      setDrawnPolygon(result.drawn_polygon);
+    }
   }, []);
 
   const handleConfirmSelection = useCallback(() => {
@@ -223,7 +228,7 @@ function App() {
     const activeScenarioName = confirmedScenarioName || scenarioName.trim();
 
     try {
-      const result = await exportCeaShapefile(selectedGeoJSON, activeScenarioName);
+      const result = await exportCeaShapefile(selectedGeoJSON, activeScenarioName, drawnPolygon);
       if (!result?.zip_base64) {
         throw new Error("CEA export did not return a shapefile ZIP");
       }
@@ -231,7 +236,7 @@ function App() {
     } catch (e) {
       alert(e?.message || "CEA export failed");
     }
-  }, [confirmedScenarioName, confirmedSelection, scenarioName, selection]);
+  }, [confirmedScenarioName, confirmedSelection, scenarioName, selection, drawnPolygon]);
 
   const runSimulation = useCallback(() => {
     // Run against confirmed selection when present, otherwise current draft selection.
@@ -430,6 +435,7 @@ function App() {
             constructionPhaseActive={Boolean(confirmedSelection)}
             onSelection={handleSelection}
             onConstructionAreaSelection={handleConstructionAreaSelection}
+            onDrawnPolygonChange={setDrawnPolygon}
           />
         </Suspense>
         {loadError && (

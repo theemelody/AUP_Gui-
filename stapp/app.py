@@ -61,8 +61,14 @@ _DEFAULT_SCENARIO_PATH = _SCENARIOS_DIR / "output-scenario"
 _DEFAULT_CEA_DB_PATH = _PROJECT_ROOT / "CityEnergyAnalyst" / "cea" / "databases" / "DE"
 
 
-def prepare_scenario(scenario_path: Path, zone_gdf):
-    """Create CEA scenario folder structure and write zone/site shapefiles."""
+def prepare_scenario(scenario_path: Path, zone_gdf, site_polygon=None):
+    """Create CEA scenario folder structure and write zone/site shapefiles.
+    
+    Args:
+        scenario_path: Path to scenario directory
+        zone_gdf: GeoDataFrame with building polygons and attributes
+        site_polygon: Area selection polygon (for site.shp). If None, uses union of buildings.
+    """
     for subdir in ["building-geometry", "building-properties", "topography", "weather"]:
         (scenario_path / "inputs" / subdir).mkdir(parents=True, exist_ok=True)
     (scenario_path / "outputs").mkdir(parents=True, exist_ok=True)
@@ -70,7 +76,13 @@ def prepare_scenario(scenario_path: Path, zone_gdf):
     geom_dir = scenario_path / "inputs" / "building-geometry"
     zone_gdf.to_file(geom_dir / "zone.shp")
 
-    site_gdf = gpd.GeoDataFrame(geometry=[zone_gdf.union_all()], crs=zone_gdf.crs)
+    # Use provided site polygon or fall back to union of buildings
+    if site_polygon is not None:
+        site_geom = site_polygon
+    else:
+        site_geom = zone_gdf.union_all()
+    
+    site_gdf = gpd.GeoDataFrame(geometry=[site_geom], crs=zone_gdf.crs)
     site_gdf.to_file(geom_dir / "site.shp")
 
 
@@ -293,12 +305,13 @@ with st.sidebar:
         _run_path = Path(st.session_state.get("sim_scenario_path", str(_DEFAULT_SCENARIO_PATH)))
         _db_path  = st.session_state.get("cea_db_path", "")
         _run_gdf  = st.session_state.get("_selected_gdf", gpd.GeoDataFrame())
+        _site_polygon = st.session_state.get("_drawn_polygon", None)
 
         with st.status("Running CEA simulation...", expanded=True) as _sim_status:
             st.write("📁 Preparing scenario structure...")
             try:
                 _run_path.mkdir(parents=True, exist_ok=True)
-                prepare_scenario(_run_path, _run_gdf)
+                prepare_scenario(_run_path, _run_gdf, _site_polygon)
                 st.write(f"✅ Scenario ready: `{_run_path}`")
             except Exception as _e:
                 _sim_status.update(label="❌ Scenario preparation failed", state="error")
@@ -550,12 +563,15 @@ with col2:
 selected_gdf = gdf.copy()
 
 # Filter by drawn geometry
+drawn_polygon = None
 if map_output and map_output.get("last_active_drawing"):
     drawn_geom = shape(map_output["last_active_drawing"]["geometry"])
+    drawn_polygon = drawn_geom
     selected_gdf = selected_gdf[selected_gdf.intersects(drawn_geom)]
 
 # Persist so sidebar can access it after rerender
 st.session_state["_selected_gdf"] = selected_gdf
+st.session_state["_drawn_polygon"] = drawn_polygon
 
 # ---------- RIGHT PANEL ----------
 with col3:

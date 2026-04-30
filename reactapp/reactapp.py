@@ -94,6 +94,7 @@ class ExportCeaShpRequest(BaseModel):
     # Selected GeoJSON FeatureCollection created by the Mapbox selection pipeline.
     selected_geojson: dict
     scenario_name: str | None = None
+    site_polygon: dict | None = None  # GeoJSON geometry object for site.shp (the area selection boundary)
 
 
 def load_mapbox_to_cea_use_type_mapping():
@@ -309,7 +310,15 @@ def normalize_scenario_name(value):
     return raw_name, os.path.join(SCENARIOS_DIR, folder_name)
 
 
-def prepare_scenario_structure(scenario_path, zone_gdf):
+def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
+    """Create scenario directory structure and write zone/site shapefiles.
+    
+    Args:
+        scenario_path: Path to scenario directory
+        zone_gdf: GeoDataFrame with building polygons and full attributes
+        site_polygon: GeoJSON geometry object representing the area selection boundary.
+                     If None, uses union of buildings.
+    """
     os.makedirs(os.path.join(scenario_path, "inputs", "building-geometry"), exist_ok=True)
     os.makedirs(os.path.join(scenario_path, "inputs", "building-properties"), exist_ok=True)
     os.makedirs(os.path.join(scenario_path, "inputs", "topography"), exist_ok=True)
@@ -317,11 +326,73 @@ def prepare_scenario_structure(scenario_path, zone_gdf):
     os.makedirs(os.path.join(scenario_path, "outputs"), exist_ok=True)
 
     geom_dir = os.path.join(scenario_path, "inputs", "building-geometry")
+    prop_dir = os.path.join(scenario_path, "inputs", "building-properties")
+    
+    # Create zone.shp with only required CEA attributes
+    zone_data = []
+    typology_data = []
+    for _, row in zone_gdf.iterrows():
+        zone_record = {
+            "geometry": row["geometry"],
+            "name": row["name"],
+            "floors_ag": int(row["floors_ag"]),
+            "floors_bg": int(row["floors_bg"]),
+            "height_ag": float(row["height_ag"]),
+            "height_bg": float(row["height_bg"]),
+            "reference": row.get("reference", "Mapbox / OSM"),
+        }
+        zone_data.append(zone_record)
+        
+        # Create typology record
+        typology_record = {
+            "geometry": row["geometry"],  # Dummy geometry for DBF writing
+            "name": row["name"],
+            "STANDARD": row.get("const_type", ""),
+            "1ST_USE": row.get("use_type1", "UNKNOWN"),
+            "1ST_USE_P": float(row.get("use_type1r", 1.0)),
+            "2ND_USE": "NONE",
+            "2ND_USE_P": 0.0,
+            "3RD_USE": "NONE",
+            "3RD_USE_P": 0.0,
+        }
+        typology_data.append(typology_record)
+    
+    zone_gdf_cleaned = gpd.GeoDataFrame(zone_data, crs=zone_gdf.crs)
+    typology_gdf = gpd.GeoDataFrame(typology_data, crs=zone_gdf.crs)
+    
+    # Write zone.shp
     zone_path = os.path.join(geom_dir, "zone.shp")
-    zone_gdf.to_file(zone_path, encoding="UTF-8")
+    zone_gdf_cleaned.to_file(zone_path, encoding="UTF-8")
 
-    site_gdf = gpd.GeoDataFrame(geometry=[zone_gdf.geometry.unary_union], crs=zone_gdf.crs)
+    # Use provided site polygon or fall back to union of buildings
+    if site_polygon is not None:
+        try:
+            site_geom = shape(site_polygon)
+        except Exception:
+            # If conversion fails, fall back to union
+            site_geom = zone_gdf_cleaned.geometry.unary_union
+    else:
+        site_geom = zone_gdf_cleaned.geometry.unary_union
+    
+    site_gdf = gpd.GeoDataFrame(geometry=[site_geom], crs=zone_gdf.crs)
     site_gdf.to_file(os.path.join(geom_dir, "site.shp"), encoding="UTF-8")
+    
+    # Write typology as a temporary shapefile, then extract DBF
+    typology_shp_tmp_path = os.path.join(geom_dir, "typology_tmp.shp")
+    typology_gdf.to_file(typology_shp_tmp_path, encoding="UTF-8")
+    
+    # Move DBF file to typology.dbf
+    typology_dbf_src = os.path.join(geom_dir, "typology_tmp.dbf")
+    typology_dbf_dst = os.path.join(prop_dir, "typology.dbf")
+    if os.path.exists(typology_dbf_src):
+        import shutil
+        shutil.move(typology_dbf_src, typology_dbf_dst)
+    
+    # Clean up temporary shapefile files
+    for ext in [".shp", ".shx", ".cpg", ".prj"]:
+        temp_file = os.path.join(geom_dir, f"typology_tmp{ext}")
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 
 def normalize_text(value):
@@ -753,8 +824,59 @@ def write_cea_zip_from_geojson(features):
     export_gdf = export_gdf.to_crs(projected_crs)
 
     tmpdir = tempfile.mkdtemp(prefix="cea-export-")
+    
+    # Create zone.shp with only required CEA attributes
+    zone_data = []
+    typology_data = []
+    for _, row in export_gdf.iterrows():
+        zone_record = {
+            "geometry": row["geometry"],
+            "name": row["name"],
+            "floors_ag": int(row["floors_ag"]),
+            "floors_bg": int(row["floors_bg"]),
+            "height_ag": float(row["height_ag"]),
+            "height_bg": float(row["height_bg"]),
+            "reference": row.get("reference", "Mapbox / OSM"),
+        }
+        zone_data.append(zone_record)
+        
+        # Create typology record (for typology.dbf)
+        typology_record = {
+            "geometry": row["geometry"],  # Add dummy geometry for shapefile writing
+            "name": row["name"],
+            "STANDARD": row.get("const_type", ""),
+            "1ST_USE": row.get("use_type1", "UNKNOWN"),
+            "1ST_USE_P": float(row.get("use_type1r", 1.0)),
+            "2ND_USE": "NONE",
+            "2ND_USE_P": 0.0,
+            "3RD_USE": "NONE",
+            "3RD_USE_P": 0.0,
+        }
+        typology_data.append(typology_record)
+    
+    zone_gdf = gpd.GeoDataFrame(zone_data, crs=projected_crs)
+    typology_gdf = gpd.GeoDataFrame(typology_data, crs=projected_crs)
+    
+    # Write zone.shp
     shp_path = os.path.join(tmpdir, "zone.shp")
-    export_gdf.to_file(shp_path, encoding="UTF-8")
+    zone_gdf.to_file(shp_path, encoding="UTF-8")
+    
+    # Write typology as a shapefile, then we'll extract the DBF
+    typology_shp_path = os.path.join(tmpdir, "typology_tmp.shp")
+    typology_gdf.to_file(typology_shp_path, encoding="UTF-8")
+    
+    # Move the DBF file to typology.dbf
+    typology_dbf_src = os.path.join(tmpdir, "typology_tmp.dbf")
+    typology_dbf_dst = os.path.join(tmpdir, "typology.dbf")
+    if os.path.exists(typology_dbf_src):
+        import shutil
+        shutil.move(typology_dbf_src, typology_dbf_dst)
+    
+    # Clean up temporary shapefile files
+    for ext in [".shp", ".shx", ".cpg", ".prj"]:
+        temp_file = os.path.join(tmpdir, f"typology_tmp{ext}")
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -842,7 +964,7 @@ def export_cea_shp(req: ExportCeaShpRequest):
         export_gdf, zip_b64 = write_cea_zip_from_geojson(features)
         scenario_raw_name, scenario_path = normalize_scenario_name(req.scenario_name)
         if scenario_raw_name:
-            prepare_scenario_structure(scenario_path, export_gdf)
+            prepare_scenario_structure(scenario_path, export_gdf, req.site_polygon)
         buildings = export_gdf.drop(columns="geometry").to_dict(orient="records")
 
         return {

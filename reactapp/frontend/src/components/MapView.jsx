@@ -449,7 +449,8 @@ function MapView({
   selectionLocked,
   constructionPhaseActive,
   onSelection,
-  onConstructionAreaSelection
+  onConstructionAreaSelection,
+  onDrawnPolygonChange
 }) {
   const mapRef = useRef(null);
   const [viewState, setViewState] = useState({
@@ -483,6 +484,7 @@ function MapView({
   const lockedSelectionGeoJSONRef = useRef(normalizedLockedSelectionGeoJSON);
   const onSelectionRef = useRef(onSelection);
   const onConstructionAreaSelectionRef = useRef(onConstructionAreaSelection);
+  const onDrawnPolygonChangeRef = useRef(onDrawnPolygonChange);
   const savedPitchRef = useRef(null);
 
   useEffect(() => {
@@ -504,6 +506,10 @@ function MapView({
   useEffect(() => {
     onConstructionAreaSelectionRef.current = onConstructionAreaSelection;
   }, [onConstructionAreaSelection]);
+
+  useEffect(() => {
+    onDrawnPolygonChangeRef.current = onDrawnPolygonChange;
+  }, [onDrawnPolygonChange]);
 
   const ensureMapboxMappingLoaded = useCallback(async () => {
     if (Object.keys(mapboxCeaUseTypeMappingRef.current || {}).length > 0) {
@@ -635,6 +641,19 @@ function MapView({
       const isConstructionPhase = constructionPhaseActiveRef.current;
       if (isLocked && !isConstructionPhase) return;
       if (selectDebounceRef.current) clearTimeout(selectDebounceRef.current);
+      
+      // Extract the drawn polygon from the geometry and pass it to callback
+      let drawnPolygon = null;
+      if (geometry?.features?.length > 0) {
+        const firstFeature = geometry.features[0];
+        if (firstFeature?.geometry) {
+          drawnPolygon = firstFeature.geometry;
+        }
+      }
+      if (onDrawnPolygonChangeRef.current) {
+        onDrawnPolygonChangeRef.current(drawnPolygon);
+      }
+      
       selectDebounceRef.current = setTimeout(async () => {
         try {
           if (!geometry) {
