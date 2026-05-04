@@ -979,6 +979,50 @@ def export_cea_shp(req: ExportCeaShpRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"CEA export failed: {e}")
 
+@app.get("/api/scenarios")
+def list_scenarios():
+    """List all scenario folders present in the scenarios directory."""
+    try:
+        if not os.path.isdir(SCENARIOS_DIR):
+            return {"scenarios": []}
+        names = []
+        for entry in sorted(os.scandir(SCENARIOS_DIR), key=lambda e: e.name):
+            if entry.is_dir():
+                name = entry.name
+                if name.endswith("-scenario"):
+                    name = name[: -len("-scenario")]
+                names.append(name)
+        return {"scenarios": names}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list scenarios: {e}")
+
+
+@app.post("/api/save-scenario")
+def save_scenario(req: ExportCeaShpRequest):
+    """Save building selection as uncompressed files to scenarios folder."""
+    try:
+        if not req.scenario_name or not req.scenario_name.strip():
+            raise ValueError("Scenario name is required")
+        
+        features = normalize_feature_collection(req.selected_geojson)
+        export_records = build_cea_export_records(features)
+        export_gdf = gpd.GeoDataFrame(export_records, crs="EPSG:4326")
+        projected_crs = build_projection_crs(export_gdf)
+        export_gdf = export_gdf.to_crs(projected_crs)
+        
+        scenario_raw_name, scenario_path = normalize_scenario_name(req.scenario_name)
+        prepare_scenario_structure(scenario_path, export_gdf, req.site_polygon)
+        
+        return {
+            "success": True,
+            "count": len(export_gdf),
+            "scenario_name": scenario_raw_name,
+            "scenario_path": scenario_path,
+            "message": f"Scenario '{scenario_raw_name}' saved successfully with {len(export_gdf)} buildings"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Save scenario failed: {e}")
+
 @app.post("/api/select")
 def select_buildings(req: SelectRequest):
     """

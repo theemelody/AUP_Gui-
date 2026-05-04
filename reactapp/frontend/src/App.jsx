@@ -1,3 +1,7 @@
+// App.jsx is superseded by App.tsx — this file is kept only so legacy imports resolve.
+export { default } from "./App.tsx";
+
+/*
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import LeftDock from "./components/LeftDock.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
@@ -12,8 +16,7 @@ import {
 import {
   fetchBuildings,
   fetchConstructionTypeMapping,
-  downloadBase64Zip,
-  exportCeaShapefile,
+  saveScenarioBuildings,
   sendChatMessage
 } from "./services/api.js";
 
@@ -221,22 +224,6 @@ function App() {
     [constructionAreaSelection, constructionMappingRows]
   );
 
-  const handleExportCeaShp = useCallback(async () => {
-    const targetSelection = confirmedSelection || selection;
-    const selectedGeoJSON = targetSelection?.selectedGeoJSON;
-    if (!selectedGeoJSON || targetSelection.count <= 0) return;
-    const activeScenarioName = confirmedScenarioName || scenarioName.trim();
-
-    try {
-      const result = await exportCeaShapefile(selectedGeoJSON, activeScenarioName, drawnPolygon);
-      if (!result?.zip_base64) {
-        throw new Error("CEA export did not return a shapefile ZIP");
-      }
-      downloadBase64Zip(result.zip_base64, result.filename || "cea_selected_buildings.zip");
-    } catch (e) {
-      alert(e?.message || "CEA export failed");
-    }
-  }, [confirmedScenarioName, confirmedSelection, scenarioName, selection, drawnPolygon]);
 
   const runSimulation = useCallback(() => {
     // Run against confirmed selection when present, otherwise current draft selection.
@@ -268,15 +255,36 @@ function App() {
     }
   }, [chatInput, chatLoading]);
 
-  const handleSaveScenario = useCallback(() => {
+  const handleSaveScenario = useCallback(async () => {
     const name = scenarioName.trim();
     if (!name) return;
-    setSavedScenarios((prev) =>
-      prev.includes(name) ? prev : [name, ...prev].slice(0, 8)
-    );
-    setScenarioName(name);
-    setConfirmedScenarioName(name);
-  }, [scenarioName]);
+    
+    // Get the target selection (confirmed or current)
+    const targetSelection = confirmedSelection || selection;
+    if (!targetSelection.selectedGeoJSON || targetSelection.count <= 0) {
+      alert("Please select buildings first before saving a scenario.");
+      return;
+    }
+
+    try {
+      const result = await saveScenarioBuildings(
+        targetSelection.selectedGeoJSON,
+        name,
+        drawnPolygon
+      );
+      
+      if (result.success) {
+        // Add to saved scenarios list
+        setSavedScenarios((prev) =>
+          prev.includes(name) ? prev : [name, ...prev].slice(0, 8)
+        );
+        setConfirmedScenarioName(name);
+        alert(`Scenario '${name}' saved successfully to ${result.scenario_path}`);
+      }
+    } catch (e) {
+      alert(e?.message || "Failed to save scenario");
+    }
+  }, [scenarioName, confirmedSelection, selection, drawnPolygon]);
 
   const activeScenarioName = confirmedScenarioName || scenarioName.trim();
   const activeScenarioPath = activeScenarioName
@@ -474,7 +482,6 @@ function App() {
           activeSelection={activeSelection}
           handleConfirmSelection={handleConfirmSelection}
           handleResetSelection={handleResetSelection}
-          handleExportCeaShp={handleExportCeaShp}
         />
 
         <RightPanel
@@ -495,4 +502,4 @@ function App() {
 }
 
 export default App;
-
+*/

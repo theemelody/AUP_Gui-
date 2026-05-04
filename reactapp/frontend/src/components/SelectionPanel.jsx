@@ -33,8 +33,7 @@ function SelectionPanel({
   confirmedSelection,
   activeSelection,
   handleConfirmSelection,
-  handleResetSelection,
-  handleExportCeaShp
+  handleResetSelection
 }) {
 
   const [isOpened, setIsOpened] = React.useState(false); 
@@ -59,23 +58,12 @@ function SelectionPanel({
         <div className="selected-list-actions">
           {confirmedSelection ? (
             <>
-              <button type="button" className="action-link" onClick={handleExportCeaShp}>
-                Export CEA SHP
-              </button>
               <button type="button" className="action-link" onClick={handleResetSelection}>
                 Reset selection
               </button>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="action-link"
-                onClick={handleExportCeaShp}
-                disabled={!selection.count || !selection.selectedGeoJSON}
-              >
-                Export CEA SHP
-              </button>
               <button
                 type="button"
                 className="action-link"

@@ -1,8 +1,9 @@
-import { useState } from "react";
 import LeftDockTab from "./common/LeftDockTab.jsx";
 
 function LeftDock({
   sidebarHidden,
+  activePage,
+  onNavigate,
   scenarioName,
   setScenarioName,
   handleSaveScenario,
@@ -11,21 +12,15 @@ function LeftDock({
   hasSelection,
   runSimulation
 }) {
-  const [activeTab, setActiveTab] = useState("simulation");
-  const emptyTabs = [
-    { id: "tech-tree", title: "Tech Tree Workspace", message: "Tech tree content will appear here." },
-    { id: "kpi", title: "KPI Workspace", message: "KPI content will appear here." },
-    { id: "secap", title: "SECAP Workspace", message: "SECAP content will appear here." }
-  ];
-
   return (
     <aside className={["left-dock", sidebarHidden ? "is-hidden" : ""].filter(Boolean).join(" ")}>
       <div className="left-dock-accordion">
+
         <LeftDockTab
           id="simulation"
           title="Building Workspace"
-          active={activeTab === "simulation"}
-          onActivate={() => setActiveTab("simulation")}
+          active={activePage === "simulation"}
+          onActivate={() => onNavigate("simulation")}
         >
           <div className="left-dock-section">
             <div className="left-dock-section-title">Model</div>
@@ -63,7 +58,7 @@ function LeftDock({
                 type="button"
                 className="scenario-save-btn"
                 onClick={handleSaveScenario}
-                disabled={!scenarioName.trim()}
+                disabled={!scenarioName.trim() || !hasSelection}
               >
                 Save
               </button>
@@ -92,17 +87,33 @@ function LeftDock({
           </div>
         </LeftDockTab>
 
-        {emptyTabs.map((tab) => (
-          <LeftDockTab
-            key={tab.id}
-            id={tab.id}
-            title={tab.title}
-            active={activeTab === tab.id}
-            onActivate={() => setActiveTab(tab.id)}
-          >
-            <div className="left-dock-empty-panel">{tab.message}</div>
-          </LeftDockTab>
-        ))}
+        <LeftDockTab
+          id="tech-tree"
+          title="Tech Tree Workspace"
+          active={activePage === "tech-tree"}
+          onActivate={() => onNavigate("tech-tree")}
+        >
+          <div className="left-dock-empty-panel">Tech tree controls will appear here.</div>
+        </LeftDockTab>
+
+        <LeftDockTab
+          id="kpi"
+          title="KPI Workspace"
+          active={activePage === "kpi"}
+          onActivate={() => onNavigate("kpi")}
+        >
+          <div className="left-dock-empty-panel">KPI controls will appear here.</div>
+        </LeftDockTab>
+
+        <LeftDockTab
+          id="secap"
+          title="SECAP Workspace"
+          active={activePage === "secap"}
+          onActivate={() => onNavigate("secap")}
+        >
+          <div className="left-dock-empty-panel">SECAP controls will appear here.</div>
+        </LeftDockTab>
+
       </div>
     </aside>
   );
