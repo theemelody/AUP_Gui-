@@ -1,20 +1,26 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import geopandas as gpd
-from shapely.geometry import shape
-from shapely.ops import unary_union
+import asyncio
+import json
 import csv
 import zipfile
 import tempfile
 import os
-from io import BytesIO
 import base64
-import json
 import requests
+from io import BytesIO
+
+import geopandas as gpd
+from shapely.geometry import shape
+from shapely.ops import unary_union
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 load_dotenv()
+
+import logging
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -82,8 +88,8 @@ except Exception as e:
     raise RuntimeError(f"Data could not be loaded: {e}")
 '''
 class ChatRequest(BaseModel):
-    # User chat prompt passed through to Ollama.
     message: str
+    model: str | None = None
 
 class SelectRequest(BaseModel):
     # Geometry drawn on map (Feature, FeatureCollection, or geometry object).
@@ -326,40 +332,32 @@ def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
     os.makedirs(os.path.join(scenario_path, "outputs"), exist_ok=True)
 
     geom_dir = os.path.join(scenario_path, "inputs", "building-geometry")
-    prop_dir = os.path.join(scenario_path, "inputs", "building-properties")
-    
-    # Create zone.shp with only required CEA attributes
+
+    # Build CEA-4 compliant zone.shp: geometry + typology columns in one file.
+    # Reference: cea/datamanagement/format_helper/cea4_verify.py COLUMNS_ZONE_4
     zone_data = []
-    typology_data = []
     for _, row in zone_gdf.iterrows():
         zone_record = {
-            "geometry": row["geometry"],
-            "name": row["name"],
-            "floors_ag": int(row["floors_ag"]),
-            "floors_bg": int(row["floors_bg"]),
-            "height_ag": float(row["height_ag"]),
-            "height_bg": float(row["height_bg"]),
-            "reference": row.get("reference", "Mapbox / OSM"),
+            "geometry":   row["geometry"],
+            "name":       row["name"],
+            "floors_bg":  int(row.get("floors_bg", 0)),
+            "floors_ag":  int(row["floors_ag"]),
+            "void_deck":  int(row.get("void_deck", 0)),
+            "height_bg":  float(row.get("height_bg", 0.0)),
+            "height_ag":  float(row["height_ag"]),
+            "year":       int(row.get("year", 2000)),
+            "const_type": str(row.get("const_type", "")),
+            "use_type1":  str(row.get("use_type1", "UNKNOWN")),
+            "use_type1r": float(row.get("use_type1r", 1.0)),
+            "use_type2":  str(row.get("use_type2", "NONE")),
+            "use_type2r": float(row.get("use_type2r", 0.0)),
+            "use_type3":  str(row.get("use_type3", "NONE")),
+            "use_type3r": float(row.get("use_type3r", 0.0)),
         }
         zone_data.append(zone_record)
-        
-        # Create typology record
-        typology_record = {
-            "geometry": row["geometry"],  # Dummy geometry for DBF writing
-            "name": row["name"],
-            "STANDARD": row.get("const_type", ""),
-            "1ST_USE": row.get("use_type1", "UNKNOWN"),
-            "1ST_USE_P": float(row.get("use_type1r", 1.0)),
-            "2ND_USE": "NONE",
-            "2ND_USE_P": 0.0,
-            "3RD_USE": "NONE",
-            "3RD_USE_P": 0.0,
-        }
-        typology_data.append(typology_record)
-    
+
     zone_gdf_cleaned = gpd.GeoDataFrame(zone_data, crs=zone_gdf.crs)
-    typology_gdf = gpd.GeoDataFrame(typology_data, crs=zone_gdf.crs)
-    
+
     # Write zone.shp
     zone_path = os.path.join(geom_dir, "zone.shp")
     zone_gdf_cleaned.to_file(zone_path, encoding="UTF-8")
@@ -369,30 +367,12 @@ def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
         try:
             site_geom = shape(site_polygon)
         except Exception:
-            # If conversion fails, fall back to union
             site_geom = zone_gdf_cleaned.geometry.unary_union
     else:
         site_geom = zone_gdf_cleaned.geometry.unary_union
-    
+
     site_gdf = gpd.GeoDataFrame(geometry=[site_geom], crs=zone_gdf.crs)
     site_gdf.to_file(os.path.join(geom_dir, "site.shp"), encoding="UTF-8")
-    
-    # Write typology as a temporary shapefile, then extract DBF
-    typology_shp_tmp_path = os.path.join(geom_dir, "typology_tmp.shp")
-    typology_gdf.to_file(typology_shp_tmp_path, encoding="UTF-8")
-    
-    # Move DBF file to typology.dbf
-    typology_dbf_src = os.path.join(geom_dir, "typology_tmp.dbf")
-    typology_dbf_dst = os.path.join(prop_dir, "typology.dbf")
-    if os.path.exists(typology_dbf_src):
-        import shutil
-        shutil.move(typology_dbf_src, typology_dbf_dst)
-    
-    # Clean up temporary shapefile files
-    for ext in [".shp", ".shx", ".cpg", ".prj"]:
-        temp_file = os.path.join(geom_dir, f"typology_tmp{ext}")
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
 
 
 def normalize_text(value):
@@ -825,58 +805,33 @@ def write_cea_zip_from_geojson(features):
 
     tmpdir = tempfile.mkdtemp(prefix="cea-export-")
     
-    # Create zone.shp with only required CEA attributes
+    # Build CEA-4 compliant zone.shp: geometry + typology columns in one file.
     zone_data = []
-    typology_data = []
     for _, row in export_gdf.iterrows():
         zone_record = {
-            "geometry": row["geometry"],
-            "name": row["name"],
-            "floors_ag": int(row["floors_ag"]),
-            "floors_bg": int(row["floors_bg"]),
-            "height_ag": float(row["height_ag"]),
-            "height_bg": float(row["height_bg"]),
-            "reference": row.get("reference", "Mapbox / OSM"),
+            "geometry":   row["geometry"],
+            "name":       row["name"],
+            "floors_bg":  int(row.get("floors_bg", 0)),
+            "floors_ag":  int(row["floors_ag"]),
+            "void_deck":  int(row.get("void_deck", 0)),
+            "height_bg":  float(row.get("height_bg", 0.0)),
+            "height_ag":  float(row["height_ag"]),
+            "year":       int(row.get("year", 2000)),
+            "const_type": str(row.get("const_type", "")),
+            "use_type1":  str(row.get("use_type1", "UNKNOWN")),
+            "use_type1r": float(row.get("use_type1r", 1.0)),
+            "use_type2":  str(row.get("use_type2", "NONE")),
+            "use_type2r": float(row.get("use_type2r", 0.0)),
+            "use_type3":  str(row.get("use_type3", "NONE")),
+            "use_type3r": float(row.get("use_type3r", 0.0)),
         }
         zone_data.append(zone_record)
-        
-        # Create typology record (for typology.dbf)
-        typology_record = {
-            "geometry": row["geometry"],  # Add dummy geometry for shapefile writing
-            "name": row["name"],
-            "STANDARD": row.get("const_type", ""),
-            "1ST_USE": row.get("use_type1", "UNKNOWN"),
-            "1ST_USE_P": float(row.get("use_type1r", 1.0)),
-            "2ND_USE": "NONE",
-            "2ND_USE_P": 0.0,
-            "3RD_USE": "NONE",
-            "3RD_USE_P": 0.0,
-        }
-        typology_data.append(typology_record)
-    
+
     zone_gdf = gpd.GeoDataFrame(zone_data, crs=projected_crs)
-    typology_gdf = gpd.GeoDataFrame(typology_data, crs=projected_crs)
-    
+
     # Write zone.shp
     shp_path = os.path.join(tmpdir, "zone.shp")
     zone_gdf.to_file(shp_path, encoding="UTF-8")
-    
-    # Write typology as a shapefile, then we'll extract the DBF
-    typology_shp_path = os.path.join(tmpdir, "typology_tmp.shp")
-    typology_gdf.to_file(typology_shp_path, encoding="UTF-8")
-    
-    # Move the DBF file to typology.dbf
-    typology_dbf_src = os.path.join(tmpdir, "typology_tmp.dbf")
-    typology_dbf_dst = os.path.join(tmpdir, "typology.dbf")
-    if os.path.exists(typology_dbf_src):
-        import shutil
-        shutil.move(typology_dbf_src, typology_dbf_dst)
-    
-    # Clean up temporary shapefile files
-    for ext in [".shp", ".shx", ".cpg", ".prj"]:
-        temp_file = os.path.join(tmpdir, f"typology_tmp{ext}")
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
 
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -893,8 +848,9 @@ def chat(req: ChatRequest):
     try:
         tags_resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         tags_resp.raise_for_status()
+        model = req.model or OLLAMA_MODEL
         payload_chat = {
-            "model": OLLAMA_MODEL,
+            "model": model,
             "messages": [
                 {"role": "system", "content": "You are an urban planning assistant."},
                 {"role": "user", "content": req.message},
@@ -906,7 +862,7 @@ def chat(req: ChatRequest):
         # Some Ollama setups expose /api/generate but not /api/chat.
         if resp.status_code == 404:
             payload_generate = {
-                "model": OLLAMA_MODEL,
+                "model": model,
                 "prompt": req.message,
                 "stream": False,
             }
@@ -923,8 +879,115 @@ def chat(req: ChatRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ollama chat failed. Ensure `ollama serve` is running and model `{OLLAMA_MODEL}` exists. Raw error: {e}",
+            detail=f"Ollama chat failed. Ensure `ollama serve` is running and model `{model}` exists. Raw error: {e}",
         )
+
+
+@app.get("/api/ollama-models")
+def get_ollama_models():
+    """Return list of locally available Ollama model names."""
+    try:
+        resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        models = [m["name"] for m in (data.get("models") or []) if m.get("name")]
+        return {"models": models or [OLLAMA_MODEL]}
+    except Exception:
+        return {"models": [OLLAMA_MODEL]}
+
+
+@app.get("/api/scenario-status/{scenario_name}")
+def get_scenario_status(scenario_name: str):
+    """Check CEA readiness for a saved scenario."""
+    folder = f"{scenario_name}-scenario"
+    path = os.path.join(SCENARIOS_DIR, folder)
+    if not os.path.isdir(path):
+        return {"status": "missing"}
+    zone_shp = os.path.join(path, "inputs", "building-geometry", "zone.shp")
+    demand_csv = os.path.join(path, "outputs", "data", "demand", "Total_demand.csv")
+    if os.path.exists(demand_csv):
+        return {"status": "complete"}
+    if os.path.exists(zone_shp):
+        return {"status": "ready"}
+    return {"status": "incomplete"}
+
+
+CEA_CMD = os.environ.get("CEA_CMD", "/home/salva/micromamba/envs/cea/bin/cea")
+
+SIMULATION_STEPS = [
+    ("database-helper",     [CEA_CMD, "database-helper",     "--databases-path", "DE"]),
+    ("archetypes-mapper",   [CEA_CMD, "archetypes-mapper"]),
+    ("surroundings-helper", [CEA_CMD, "surroundings-helper"]),
+    ("terrain-helper",      [CEA_CMD, "terrain-helper"]),
+    ("weather-helper",      [CEA_CMD, "weather-helper"]),
+    ("radiation",           [CEA_CMD, "radiation",           "--multiprocessing", "true"]),
+    ("occupancy",           [CEA_CMD, "occupancy",           "--multiprocessing", "true"]),
+    ("demand",              [CEA_CMD, "demand",              "--multiprocessing", "true"]),
+]
+
+
+_logger = __import__("logging").getLogger("cea_pipeline")
+
+
+async def _cea_pipeline(scenario_path: str):
+    base_args = ["--scenario", scenario_path]
+    for step_name, cmd in SIMULATION_STEPS:
+        full_cmd = cmd + base_args
+        _logger.info("CEA step [%s]: %s", step_name, " ".join(full_cmd))
+        yield f"data: {json.dumps({'step': step_name, 'status': 'running'})}\n\n"
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *full_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except FileNotFoundError as exc:
+            msg = f"Executable not found: {full_cmd[0]} — {exc}"
+            _logger.error("CEA step [%s] launch failed: %s", step_name, msg)
+            yield f"data: {json.dumps({'step': step_name, 'status': 'error', 'message': msg})}\n\n"
+            yield f"data: {json.dumps({'status': 'failed'})}\n\n"
+            return
+
+        tail: list[str] = []
+        async for raw_line in proc.stdout:
+            line = raw_line.decode(errors="replace").strip()
+            if not line:
+                continue
+            _logger.debug("  [%s] %s", step_name, line)
+            tail = (tail + [line])[-20:]  # keep last 20 lines for error context
+            yield f"data: {json.dumps({'step': step_name, 'status': 'running', 'message': line})}\n\n"
+
+        await proc.wait()
+
+        if proc.returncode != 0:
+            context = " | ".join(tail[-5:]) if tail else "(no output)"
+            _logger.error(
+                "CEA step [%s] exited %d. Last output: %s",
+                step_name, proc.returncode, context,
+            )
+            yield f"data: {json.dumps({'step': step_name, 'status': 'error', 'message': f'Exit code {proc.returncode}: {context}'})}\n\n"
+            yield f"data: {json.dumps({'status': 'failed'})}\n\n"
+            return
+
+        _logger.info("CEA step [%s] done.", step_name)
+        yield f"data: {json.dumps({'step': step_name, 'status': 'done'})}\n\n"
+
+    yield f"data: {json.dumps({'status': 'complete'})}\n\n"
+
+
+@app.get("/api/run-simulation")
+async def run_simulation(scenario_name: str):
+    """Stream CEA simulation pipeline progress via SSE."""
+    folder = f"{scenario_name}-scenario"
+    scenario_path = os.path.join(SCENARIOS_DIR, folder)
+    if not os.path.isdir(scenario_path):
+        raise HTTPException(status_code=404, detail=f"Scenario not found: {scenario_path}")
+    return StreamingResponse(
+        _cea_pipeline(scenario_path),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @app.get("/api/buildings")
 def get_buildings():

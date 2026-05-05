@@ -5,7 +5,6 @@ import SelectionPanel from '../components/SelectionPanel.jsx';
 import {
   fetchBuildings,
   fetchConstructionTypeMapping,
-  sendChatMessage,
 } from '../services/api.js';
 import {
   getFeatureStableKey,
@@ -22,7 +21,6 @@ const USE_MAPBOX_BUILDINGS =
 // ── shared types ─────────────────────────────────────────────────────────────
 
 type Row = Record<string, unknown>;
-type ChatMessage = { role: string; text: string };
 
 interface SelectionState {
   count: number;
@@ -154,15 +152,6 @@ function BuildingSelection({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      text: 'Hi! I am connected to Ollama. Ask me anything about your selected buildings.',
-    },
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const [confirmedSelection, setConfirmedSelection] = useState<SelectionState | null>(null);
   const [constructionMappingRows, setConstructionMappingRows] = useState<Row[]>([]);
@@ -278,29 +267,6 @@ function BuildingSelection({
     [constructionAreaSelection, constructionMappingRows],
   );
 
-  const handleSendChat = useCallback(async () => {
-    const message = chatInput.trim();
-    if (!message || chatLoading) return;
-
-    setChatError(null);
-    setChatMessages((prev: ChatMessage[]) => [
-      ...prev,
-      { role: 'user', text: message },
-    ]);
-    setChatInput('');
-    setChatLoading(true);
-    try {
-      const reply = await sendChatMessage(message);
-      setChatMessages((prev: ChatMessage[]) => [
-        ...prev,
-        { role: 'assistant', text: reply || 'No response.' },
-      ]);
-    } catch (e) {
-      setChatError((e as Error)?.message || 'Chat request failed');
-    } finally {
-      setChatLoading(false);
-    }
-  }, [chatInput, chatLoading]);
 
   useEffect(() => {
     if (USE_MAPBOX_BUILDINGS) return;
@@ -478,12 +444,6 @@ function BuildingSelection({
         leftCollapsed={leftCollapsed}
         setLeftCollapsed={setLeftCollapsed}
         activeSelectionCount={activeSelection.count}
-        chatMessages={chatMessages}
-        chatLoading={chatLoading}
-        chatError={chatError}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        handleSendChat={handleSendChat}
       />
 
       <SelectionPanel

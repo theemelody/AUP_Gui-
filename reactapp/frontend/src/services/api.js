@@ -241,14 +241,31 @@ export function downloadBase64Zip(zipBase64, filename = "cea_selected_buildings.
   URL.revokeObjectURL(url);
 }
 
-export async function sendChatMessage(message) {
-  // Sends chat input to backend, which proxies to Ollama and returns model reply.
+export async function fetchOllamaModels() {
+  try {
+    const res = await fetch(`${API_BASE}/ollama-models`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.models) ? data.models : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchScenarioStatus(scenarioName) {
+  const res = await fetch(`${API_BASE}/scenario-status/${encodeURIComponent(scenarioName)}`);
+  if (!res.ok) return "missing";
+  const data = await res.json();
+  return data?.status || "missing";
+}
+
+export async function sendChatMessage(message, model) {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ message })
+    body: JSON.stringify({ message, ...(model ? { model } : {}) })
   });
   if (!res.ok) {
     let detail = `Chat request failed (${res.status})`;

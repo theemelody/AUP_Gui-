@@ -234,3 +234,86 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Scenario chips — clickable with status indicator */
+
+.left-dock-chip {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  user-select: none;
+}
+
+.left-dock-chip.is-selected {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.left-dock-chip:hover:not(.is-selected) {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.scenario-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.scenario-status-dot.complete   { background: #22c55e; }
+.scenario-status-dot.ready      { background: #f59e0b; }
+.scenario-status-dot.incomplete { background: #94a3b8; }
+
+/* Simulation log */
+
+.simulation-log {
+  margin-top: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.sim-log-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 3px 0;
+}
+
+.sim-log-icon {
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.sim-log-running .sim-log-icon { color: #f0a500; animation: spin 1s linear infinite; }
+.sim-log-done    .sim-log-icon { color: #22c55e; }
+.sim-log-error   .sim-log-icon { color: #ef4444; }
+.sim-log-idle    .sim-log-icon { color: #94a3b8; }
+
+.sim-log-label { color: #cbd5e1; }
+
+.sim-log-detail {
+  margin: 2px 0 4px 20px;
+  font-size: var(--font-size-xs);
+  color: #fca5a5;
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+.sim-log-complete {
+  margin-top: var(--spacing-sm);
+  color: #22c55e;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.sim-log-failed {
+  margin-top: var(--spacing-sm);
+  color: #ef4444;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

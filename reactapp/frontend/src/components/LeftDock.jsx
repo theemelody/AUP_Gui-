@@ -1,5 +1,36 @@
 import LeftDockTab from "./common/LeftDockTab.jsx";
 
+const STEP_ICON = { idle: "○", running: "⟳", done: "✓", error: "✗" };
+const STEP_LABEL = {
+  "database-helper":    "Load databases",
+  "archetypes-mapper":  "Map archetypes",
+  "surroundings-helper":"Fetch surroundings",
+  "terrain-helper":     "Fetch terrain",
+  "weather-helper":     "Fetch weather",
+  "radiation":          "Solar radiation",
+  "occupancy":          "Occupancy profiles",
+  "demand":             "Energy demand",
+};
+
+function ScenarioChip({ name, status, selected, onSelect }) {
+  const dotClass = status === "complete" ? "complete"
+    : status === "ready"    ? "ready"
+    : "incomplete";
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={["left-dock-chip", selected ? "is-selected" : ""].filter(Boolean).join(" ")}
+      onClick={() => onSelect(selected ? "" : name)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(selected ? "" : name); }}
+    >
+      <span className={`scenario-status-dot ${dotClass}`} title={status} />
+      <span>{name}</span>
+    </div>
+  );
+}
+
 function LeftDock({
   sidebarHidden,
   activePage,
@@ -10,7 +41,12 @@ function LeftDock({
   savedScenarios,
   scenarioPath,
   hasSelection,
-  runSimulation
+  runSimulation,
+  selectedScenarioForSim = "",
+  setSelectedScenarioForSim,
+  scenarioStatuses = {},
+  simulationLog = [],
+  simulationStatus = "idle",
 }) {
   return (
     <aside className={["left-dock", sidebarHidden ? "is-hidden" : ""].filter(Boolean).join(" ")}>
@@ -23,26 +59,8 @@ function LeftDock({
           onActivate={() => onNavigate("simulation")}
         >
           <div className="left-dock-section">
-            <div className="left-dock-section-title">Model</div>
-            <div className="left-dock-field">llama3.1:8b</div>
-            <div className="left-dock-status-row">
-              <span className="status-dot status-off" />
-              OpenAI (no key)
-            </div>
-            <div className="left-dock-status-row">
-              <span className="status-dot status-on" />
-              Ollama
-            </div>
-          </div>
-
-          <div className="left-dock-section">
-            <div className="left-dock-section-title">Simulation Settings</div>
-            <div className="left-dock-field">/home/user/automatic-urban-planner</div>
-            {scenarioPath ? <div className="left-dock-muted">{scenarioPath}</div> : null}
-          </div>
-
-          <div className="left-dock-section">
             <div className="left-dock-section-title">Simulation</div>
+
             <div className="scenario-save-row">
               <input
                 type="text"
@@ -50,9 +68,7 @@ function LeftDock({
                 placeholder="Scenario name"
                 value={scenarioName}
                 onChange={(e) => setScenarioName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveScenario();
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveScenario(); }}
               />
               <button
                 type="button"
@@ -69,9 +85,13 @@ function LeftDock({
                 <div className="left-dock-muted">No saved scenarios yet.</div>
               ) : (
                 savedScenarios.map((name) => (
-                  <div className="left-dock-chip" key={name}>
-                    {name}
-                  </div>
+                  <ScenarioChip
+                    key={name}
+                    name={name}
+                    status={scenarioStatuses[name] || "missing"}
+                    selected={selectedScenarioForSim === name}
+                    onSelect={setSelectedScenarioForSim}
+                  />
                 ))
               )}
             </div>
@@ -79,11 +99,35 @@ function LeftDock({
             <button
               type="button"
               className="left-dock-run-btn"
-              disabled={!hasSelection}
+              disabled={!selectedScenarioForSim || simulationStatus === "running"}
               onClick={runSimulation}
             >
-              Run simulation
+              {simulationStatus === "running" ? "Running…" : "Run simulation"}
             </button>
+
+            {simulationStatus !== "idle" && (
+              <div className="simulation-log">
+                {simulationLog.map((entry) => (
+                  <div key={entry.step} className={`sim-log-entry sim-log-${entry.status}`}>
+                    <div className="sim-log-row">
+                      <span className="sim-log-icon">{STEP_ICON[entry.status]}</span>
+                      <span className="sim-log-label">{STEP_LABEL[entry.step] ?? entry.step}</span>
+                    </div>
+                    {entry.status === "error" && entry.messages.length > 0 && (
+                      <div className="sim-log-detail">
+                        {entry.messages[entry.messages.length - 1]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {simulationStatus === "done" && (
+                  <div className="sim-log-complete">Simulation complete</div>
+                )}
+                {simulationStatus === "failed" && (
+                  <div className="sim-log-failed">Simulation failed</div>
+                )}
+              </div>
+            )}
           </div>
         </LeftDockTab>
 
