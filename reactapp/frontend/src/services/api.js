@@ -259,6 +259,24 @@ export async function fetchScenarioStatus(scenarioName) {
   return data?.status || "missing";
 }
 
+export async function fetchScenarioData(scenarioName) {
+  const res = await fetch(`${API_BASE}/scenario-data/${encodeURIComponent(scenarioName)}`);
+  if (!res.ok) throw new Error(`Scenario data not found (${res.status})`);
+  return res.json();
+}
+
+export async function fetchTechTreeGraph(scenarioName = '', region = 'DE') {
+  const params = new URLSearchParams({ region });
+  if (scenarioName) params.append('scenario_name', scenarioName);
+  const res = await fetch(`${API_BASE}/techtree-graph?${params}`);
+  if (!res.ok) {
+    let detail = `TechTree graph request failed (${res.status})`;
+    try { const d = await res.json(); detail = d?.detail || detail; } catch { /* keep fallback */ }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 export async function sendChatMessage(message, model) {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",

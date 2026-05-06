@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import ChatPanel from '../components/ChatPanel.jsx';
 import RightPanel from '../components/RightPanel.jsx';
 import SelectionPanel from '../components/SelectionPanel.jsx';
@@ -142,11 +142,15 @@ export interface ActiveSelectionInfo {
 interface BuildingSelectionProps {
   onActiveSelectionChange: (info: ActiveSelectionInfo | null) => void;
   onDrawnPolygonChange: (polygon: unknown) => void;
+  onConstTypesChange?: (types: string[]) => void;
+  loadedScenario?: { geojson: unknown; drawnPolygon: unknown } | null;
 }
 
 function BuildingSelection({
   onActiveSelectionChange,
   onDrawnPolygonChange,
+  onConstTypesChange,
+  loadedScenario,
 }: BuildingSelectionProps) {
   const [buildingsGeoJSON, setBuildingsGeoJSON] = useState<unknown>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -329,13 +333,14 @@ function BuildingSelection({
     onDrawnPolygonChange(drawnPolygon);
   }, [drawnPolygon, onDrawnPolygonChange]);
 
-  // ── derived state ──────────────────────────────────────────────────────────
+  // ── derived state (memoized to prevent render loops) ──────────────────────
 
-  const confirmedFeatureCollection = parseGeoJSON(
-    confirmedSelection?.selectedGeoJSON,
-  ) as { features?: GeoFeature[] } | null;
+  const confirmedFeatureCollection = useMemo(
+    () => parseGeoJSON(confirmedSelection?.selectedGeoJSON) as { features?: GeoFeature[] } | null,
+    [confirmedSelection],
+  );
 
-  const lockedSelectionGeoJSONWithState = (() => {
+  const lockedSelectionGeoJSONWithState = useMemo(() => {
     if (!confirmedFeatureCollection?.features?.length) return null;
     const features = confirmedFeatureCollection.features;
     const total = features.length;
@@ -370,14 +375,17 @@ function BuildingSelection({
         };
       }),
     };
-  })();
+  }, [confirmedFeatureCollection, buildingAssignments]);
 
-  const confirmedBuildingsWithAssignments =
-    (
-      lockedSelectionGeoJSONWithState?.features as
-        | Array<{ properties: Record<string, unknown> }>
-        | undefined
-    )?.map((f) => f.properties) ?? [];
+  const confirmedBuildingsWithAssignments = useMemo(
+    () =>
+      (
+        lockedSelectionGeoJSONWithState?.features as
+          | Array<{ properties: Record<string, unknown> }>
+          | undefined
+      )?.map((f) => f.properties) ?? [],
+    [lockedSelectionGeoJSONWithState],
+  );
 
   const definedBuildingCount = confirmedBuildingsWithAssignments.filter(
     (props) => props?.const_type,
@@ -385,6 +393,51 @@ function BuildingSelection({
   const allConstructionDefined =
     confirmedBuildingsWithAssignments.length > 0 &&
     definedBuildingCount === confirmedBuildingsWithAssignments.length;
+
+  useEffect(() => {
+    const types = [...new Set(
+      confirmedBuildingsWithAssignments
+        .map((p) => p?.const_type as string)
+        .filter(Boolean),
+    )];
+    onConstTypesChange?.(types);
+  }, [confirmedBuildingsWithAssignments, onConstTypesChange]);
+
+  useEffect(() => {
+    if (!loadedScenario?.geojson) return;
+    const fc = loadedScenario.geojson as { features?: GeoFeature[] };
+    if (!Array.isArray(fc?.features) || !fc.features.length) return;
+
+    const assignments: Record<string, Row> = {};
+    fc.features.forEach((feature, index) => {
+      const key = getFeatureStableKey(feature, index);
+      const p = feature.properties || {};
+      if (p.const_type) {
+        assignments[key] = {
+          const_type: p.const_type,
+          refurbishment_type: p.refurbishment_type ?? null,
+          detail: p.detail ?? null,
+          year_start: p.feature_year_start ?? null,
+          year_end: p.feature_year_end ?? null,
+          mapbox_type: p.mapbox_type ?? null,
+          cea_use_type1: p.cea_use_type1 ?? null,
+        };
+      }
+    });
+
+    const restoredSelection: SelectionState = {
+      count: fc.features.length,
+      selectedGeoJSON: loadedScenario.geojson,
+      zipBase64: null,
+      buildings: fc.features.map((f) => f.properties || {}),
+      selectionError: null,
+    };
+
+    setSelection(restoredSelection);
+    setConfirmedSelection(restoredSelection);
+    setBuildingAssignments(assignments);
+    if (loadedScenario.drawnPolygon) setDrawnPolygon(loadedScenario.drawnPolygon);
+  }, [loadedScenario]);
 
   const activeSelection = confirmedSelection
     ? {
@@ -418,6 +471,7 @@ function BuildingSelection({
           onSelection={handleSelection}
           onConstructionAreaSelection={handleConstructionAreaSelection}
           onDrawnPolygonChange={setDrawnPolygon}
+          fitToGeoJSON={confirmedSelection?.selectedGeoJSON}
         />
       </Suspense>
 

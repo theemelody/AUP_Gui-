@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import LeftDock from './components/LeftDock.jsx';
 import { useNavigation } from './hooks/useNavigation';
-import { fetchScenarios, fetchScenarioStatus, saveScenarioBuildings } from './services/api.js';
+import { fetchScenarios, fetchScenarioStatus, fetchScenarioData, saveScenarioBuildings } from './services/api.js';
 import type { ActiveSelectionInfo } from './pages/buildingSelection';
 import type { PageId } from './states/navigationMachine';
 
@@ -30,10 +30,15 @@ function App() {
   const [confirmedScenarioName, setConfirmedScenarioName] = useState('');
   const [savedScenarios, setSavedScenarios] = useState<string[]>([]);
   const [hasSelection, setHasSelection] = useState(false);
+  const [activeConstTypes, setActiveConstTypes] = useState<string[]>([]);
 
   // Scenario simulation selection + status
   const [selectedScenarioForSim, setSelectedScenarioForSim] = useState('');
   const [scenarioStatuses, setScenarioStatuses] = useState<Record<string, ScenarioStatus>>({});
+  const [loadedScenario, setLoadedScenario] = useState<{
+    geojson: unknown;
+    drawnPolygon: unknown;
+  } | null>(null);
 
   // Simulation SSE state
   const [simulationLog, setSimulationLog] = useState<LogEntry[]>([]);
@@ -85,6 +90,19 @@ function App() {
       alert((e as Error)?.message || 'Failed to save scenario');
     }
   }, [scenarioName]);
+
+  const handleSelectScenarioChip = useCallback(async (name: string) => {
+    setSelectedScenarioForSim(name);
+    if (!name) { setLoadedScenario(null); return; }
+    try {
+      const data = await fetchScenarioData(name);
+      setLoadedScenario({ geojson: data.selected_geojson, drawnPolygon: data.drawn_polygon });
+      setConfirmedScenarioName(name);
+      navigate('simulation' as PageId);
+    } catch (e) {
+      console.warn('[App] scenario.json not found, skipping load:', e);
+    }
+  }, [navigate]);
 
   const runSimulation = useCallback(() => {
     const name = selectedScenarioForSim;
@@ -182,7 +200,7 @@ function App() {
         hasSelection={hasSelection}
         runSimulation={runSimulation}
         selectedScenarioForSim={selectedScenarioForSim}
-        setSelectedScenarioForSim={setSelectedScenarioForSim}
+        setSelectedScenarioForSim={handleSelectScenarioChip}
         scenarioStatuses={scenarioStatuses}
         simulationLog={simulationLog}
         simulationStatus={simulationStatus}
@@ -203,12 +221,18 @@ function App() {
             <BuildingSelection
               onActiveSelectionChange={handleActiveSelectionChange}
               onDrawnPolygonChange={handleDrawnPolygonChange}
+              onConstTypesChange={setActiveConstTypes}
+              loadedScenario={loadedScenario}
             />
           </Suspense>
         </div>
         <div style={{ display: activePage === 'tech-tree' ? undefined : 'none' }}>
           <Suspense fallback={PAGE_FALLBACK}>
-            <TechTree />
+            <TechTree
+              activeConstTypes={activeConstTypes}
+              scenarioName={confirmedScenarioName}
+              isActive={activePage === 'tech-tree'}
+            />
           </Suspense>
         </div>
         <div style={{ display: activePage === 'kpi' ? undefined : 'none' }}>

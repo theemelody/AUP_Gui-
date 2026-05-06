@@ -43,7 +43,8 @@
 /* Body */
 
 .selected-list-body {
-  overflow: auto;
+  overflow-y: auto;
+  max-height: min(24vh, 240px);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--spacing-md);

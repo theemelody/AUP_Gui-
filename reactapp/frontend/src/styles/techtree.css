@@ -1,0 +1,133 @@
+/* ── TechTree page ───────────────────────────────────────────────────────── */
+
+.techtree-root {
+  position: absolute;
+  inset: 0;
+  background: var(--color-dark-bg, #0f172a);
+  overflow: hidden;
+}
+
+.techtree-root .react-flow {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── layer band labels (left sidebar) ───────────────────────────────────── */
+
+.techtree-layer-label {
+  position: absolute;
+  left: 8px;
+  z-index: 10;
+  pointer-events: none;
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  color: var(--color-dark-text-muted, #94a3b8);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+}
+
+/* ── regular tech node ───────────────────────────────────────────────────── */
+
+.tech-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.85);
+  font-size: 11px;
+  font-family: var(--font-stack, monospace);
+  color: var(--color-dark-text, #dbeafe);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  transition: opacity var(--transition-fast, 180ms ease);
+  cursor: default;
+}
+
+.tech-node--active {
+  border-color: var(--color-accent-sky, #38bdf8);
+  background: rgba(56, 189, 248, 0.12);
+  color: #e0f2fe;
+}
+
+.tech-node--inactive {
+  opacity: 0.22;
+}
+
+/* ── sublayer pill (collapsed group) ────────────────────────────────────── */
+
+.sublayer-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 2px solid #555;
+  background: rgba(15, 23, 42, 0.9);
+  font-size: 11px;
+  font-family: var(--font-stack, monospace);
+  color: var(--color-dark-text, #dbeafe);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity var(--transition-fast, 180ms ease),
+              background var(--transition-fast, 180ms ease);
+}
+
+.sublayer-pill:hover {
+  background: rgba(30, 41, 59, 0.95);
+  opacity: 1 !important;
+}
+
+.sublayer-pill--active {
+  background: rgba(56, 189, 248, 0.08);
+  color: #e0f2fe;
+}
+
+.sublayer-pill__chevron {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+/* ── loading / error overlays ────────────────────────────────────────────── */
+
+.techtree-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm, 12px);
+  color: var(--color-dark-text-muted, #94a3b8);
+  pointer-events: none;
+}
+
+.techtree-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-status-error, #ef4444);
+  font-size: var(--font-size-sm, 12px);
+  padding: 24px;
+}
+
+/* ── react-flow overrides ────────────────────────────────────────────────── */
+
+.techtree-root .react-flow__node {
+  /* prevent react-flow default padding from interfering */
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.techtree-root .react-flow__handle {
+  width: 6px;
+  height: 6px;
+  background: rgba(148, 163, 184, 0.3);
+  border: none;
+}

@@ -1,5 +1,23 @@
 /* === CHAT PANEL === */
 
+.bottom-panel-left {
+  position: absolute;
+  top: 12px;
+  left: 76px;
+  width: var(--panel-w);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  background: rgba(229, 231, 235, 0.55);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
+  pointer-events: auto;
+  z-index: 5;
+}
+
 .chatbot-section {
   min-height: 260px;
 }

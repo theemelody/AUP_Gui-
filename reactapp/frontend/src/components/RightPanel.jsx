@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import CollapsiblePanel from "./common/CollapsiblePanel.jsx";
+import { Collapse } from "react-collapse";
 import LabeledSelectField from "./common/LabeledSelectField.jsx";
 import {
   getBuildingMapboxType,
@@ -386,14 +386,14 @@ function RightPanel({
   };
 
   return (
-    <CollapsiblePanel
-      positionClass="bottom-panel-right"
-      collapsed={rightCollapsed}
-      setCollapsed={setRightCollapsed}
-      title="Construction type phase"
-      expandAriaLabel="Expand right panel"
-      collapseAriaLabel="Collapse right panel"
-    >
+    <section className="bottom-panel-right" aria-label="Construction type phase">
+      <div>
+        <button type="button" className="action-link" onClick={() => setRightCollapsed(!rightCollapsed)}>
+          {rightCollapsed ? "Show Construction type phase" : "Hide Construction type phase"}
+        </button>
+      </div>
+      <Collapse isOpened={!rightCollapsed}>
+      <div>
       {!constructionPhaseActive ? (
           <div className="construction-muted">
             Confirm building selection first. Confirmed buildings will turn orange, then
@@ -607,7 +607,9 @@ function RightPanel({
             </button>
         </>
       )}
-    </CollapsiblePanel>
+      </div>
+      </Collapse>
+    </section>
   );
 }
 

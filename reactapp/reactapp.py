@@ -1,6 +1,7 @@
 import asyncio
 import json
 import csv
+import datetime
 import zipfile
 import tempfile
 import os
@@ -68,6 +69,75 @@ CEA_DE_CONSTRUCTION_TYPES_PATH = os.path.join(
     "CONSTRUCTION_TYPES.csv",
 )
 MAPBOX_REVERSE_GEOCODE_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/{lon},{lat}.json"
+
+CEA_DE_ASSEMBLIES_PATH = os.path.join(
+    BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", "DE", "ASSEMBLIES"
+)
+CEA_DE_FEEDSTOCKS_PATH = os.path.join(
+    BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", "DE",
+    "COMPONENTS", "FEEDSTOCKS", "FEEDSTOCKS_LIBRARY"
+)
+CEA_DE_CONVERSION_PATH = os.path.join(
+    BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", "DE",
+    "COMPONENTS", "CONVERSION"
+)
+
+ARCHETYPE_FIELD_TO_ASSEMBLY = {
+    "type_wall":       ("l2.1", "ENVELOPE_WALL"),
+    "type_roof":       ("l2.1", "ENVELOPE_ROOF"),
+    "type_win":        ("l2.1", "ENVELOPE_WINDOW"),
+    "type_floor":      ("l2.1", "ENVELOPE_FLOOR"),
+    "type_base":       ("l2.1", "ENVELOPE_FLOOR"),
+    "type_shade":      ("l2.1", "ENVELOPE_SHADING"),
+    "type_mass":       ("l2.1", "ENVELOPE_MASS"),
+    "type_leak":       ("l2.1", "ENVELOPE_TIGHTNESS"),
+    "hvac_type_hs":    ("l2.2", "HVAC_HEATING"),
+    "hvac_type_cs":    ("l2.2", "HVAC_COOLING"),
+    "hvac_type_dhw":   ("l2.2", "HVAC_HOTWATER"),
+    "hvac_type_ctrl":  ("l2.2", "HVAC_CONTROLLER"),
+    "hvac_type_vent":  ("l2.2", "HVAC_VENTILATION"),
+    "supply_type_hs":  ("l2.3", "SUPPLY_HEATING"),
+    "supply_type_dhw": ("l2.3", "SUPPLY_HOTWATER"),
+    "supply_type_cs":  ("l2.3", "SUPPLY_COOLING"),
+    "supply_type_el":  ("l2.3", "SUPPLY_ELECTRICITY"),
+}
+
+ASSEMBLY_FAMILY_TO_FILE = {
+    "ENVELOPE_WALL":      ("ENVELOPE", "ENVELOPE_WALL.csv"),
+    "ENVELOPE_ROOF":      ("ENVELOPE", "ENVELOPE_ROOF.csv"),
+    "ENVELOPE_WINDOW":    ("ENVELOPE", "ENVELOPE_WINDOW.csv"),
+    "ENVELOPE_FLOOR":     ("ENVELOPE", "ENVELOPE_FLOOR.csv"),
+    "ENVELOPE_SHADING":   ("ENVELOPE", "ENVELOPE_SHADING.csv"),
+    "ENVELOPE_MASS":      ("ENVELOPE", "ENVELOPE_MASS.csv"),
+    "ENVELOPE_TIGHTNESS": ("ENVELOPE", "ENVELOPE_TIGHTNESS.csv"),
+    "HVAC_HEATING":       ("HVAC",     "HVAC_HEATING.csv"),
+    "HVAC_COOLING":       ("HVAC",     "HVAC_COOLING.csv"),
+    "HVAC_HOTWATER":      ("HVAC",     "HVAC_HOTWATER.csv"),
+    "HVAC_CONTROLLER":    ("HVAC",     "HVAC_CONTROLLER.csv"),
+    "HVAC_VENTILATION":   ("HVAC",     "HVAC_VENTILATION.csv"),
+    "SUPPLY_HEATING":     ("SUPPLY",   "SUPPLY_HEATING.csv"),
+    "SUPPLY_HOTWATER":    ("SUPPLY",   "SUPPLY_HOTWATER.csv"),
+    "SUPPLY_COOLING":     ("SUPPLY",   "SUPPLY_COOLING.csv"),
+    "SUPPLY_ELECTRICITY": ("SUPPLY",   "SUPPLY_ELECTRICITY.csv"),
+}
+
+FUEL_CODE_TO_FEEDSTOCK = {
+    "Cgas":   "NATURALGAS",
+    "Coil":   "OIL",
+    "Cdbm":   "DRYBIOMASS",
+    "Cwod":   "WOOD",
+    "E230AC": "GRID",
+}
+
+CONVERSION_FILE_TO_FEEDSTOCK = {
+    "HEAT_PUMPS.csv":                  "GRID",
+    "PHOTOVOLTAIC_PANELS.csv":         "SOLAR",
+    "PHOTOVOLTAIC_THERMAL_PANELS.csv": "SOLAR",
+    "SOLAR_COLLECTORS.csv":            "SOLAR",
+    "FUEL_CELLS.csv":                  "GRID",
+}
+
+_techtree_logger = logging.getLogger("techtree")
 NOMINATIM_REVERSE_GEOCODE_URL = "https://nominatim.openstreetmap.org/reverse"
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 SCENARIOS_DIR = os.path.join(PROJECT_ROOT, "scenarios")
@@ -842,6 +912,148 @@ def write_cea_zip_from_geojson(features):
 
     return export_gdf.to_crs(epsg=4326), zip_b64
 
+def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    edge_set: set[tuple] = set()
+
+    def add_node(node_id, label, layer, sublayer, description=""):
+        if node_id not in nodes:
+            nodes[node_id] = {"id": node_id, "label": label, "layer": layer, "sublayer": sublayer, "description": description}
+
+    def add_edge(src, tgt, field=""):
+        key = (src, tgt)
+        if key not in edge_set:
+            edge_set.add(key)
+            edges.append({"id": f"e_{src}__{tgt}", "source": src, "target": tgt, **({"field": field} if field else {})})
+
+    assemblies_base = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "ASSEMBLIES")
+    conversion_base = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "COMPONENTS", "CONVERSION")
+    feedstocks_base = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "COMPONENTS", "FEEDSTOCKS", "FEEDSTOCKS_LIBRARY")
+    const_types_path = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "ARCHETYPES", "CONSTRUCTION", "CONSTRUCTION_TYPES.csv")
+
+    # L0 + L1 nodes from CONSTRUCTION_TYPES.csv
+    if os.path.exists(const_types_path):
+        with open(const_types_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                ct = str(row.get("const_type") or "").strip()
+                if not ct:
+                    continue
+                desc = str(row.get("description") or "").strip()
+                add_node(ct, ct, 0, "l0", desc)
+                for field, (sublayer, family_id) in ARCHETYPE_FIELD_TO_ASSEMBLY.items():
+                    code = str(row.get(field) or "").strip()
+                    if not code:
+                        continue
+                    add_node(code, code, 1, "l1")
+                    add_edge(ct, code, field)
+    else:
+        _techtree_logger.warning("TechTree: CONSTRUCTION_TYPES.csv not found at %s", const_types_path)
+
+    # L2 nodes + L1→L2 edges, and L3 nodes from assembly files
+    seen_families: set[str] = set()
+    for family_id, (subcat, filename) in ASSEMBLY_FAMILY_TO_FILE.items():
+        sublayer = "l2.1" if subcat == "ENVELOPE" else ("l2.2" if subcat == "HVAC" else "l2.3")
+        layer2_rank = 2 if subcat == "ENVELOPE" else (3 if subcat == "HVAC" else 4)
+        if family_id not in seen_families:
+            seen_families.add(family_id)
+            label = family_id.replace("_", " ").title()
+            add_node(family_id, label, layer2_rank, sublayer)
+
+        filepath = os.path.join(assemblies_base, subcat, filename)
+        if not os.path.exists(filepath):
+            continue
+        with open(filepath, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            headers = reader.fieldnames or []
+            has_primary = "primary_components" in headers
+            has_feedstock = "feedstock" in headers
+            for row in reader:
+                code = str(row.get("code") or "").strip()
+                if not code:
+                    continue
+                if code in nodes:
+                    add_edge(code, family_id)
+                if has_primary:
+                    comp = str(row.get("primary_components") or "").strip()
+                    if comp and comp != "-":
+                        add_node(comp, comp, 5, "l3.1")
+                        add_edge(family_id, comp)
+                if has_feedstock:
+                    fs = str(row.get("feedstock") or "").strip().upper()
+                    if fs and fs != "NONE":
+                        add_node(fs, fs.capitalize(), 6, "l3.2")
+                        add_edge(family_id, fs)
+
+    # L3.1→L3.2 edges from CONVERSION files
+    if os.path.exists(conversion_base):
+        for fname in os.listdir(conversion_base):
+            if not fname.endswith(".csv"):
+                continue
+            fpath = os.path.join(conversion_base, fname)
+            inferred_fs = CONVERSION_FILE_TO_FEEDSTOCK.get(fname)
+            with open(fpath, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                headers = reader.fieldnames or []
+                has_fuel = "fuel_code" in headers
+                for row in reader:
+                    code = str(row.get("code") or "").strip()
+                    if not code or code not in nodes:
+                        continue
+                    if has_fuel:
+                        fc = str(row.get("fuel_code") or "").strip()
+                        fs = FUEL_CODE_TO_FEEDSTOCK.get(fc)
+                    else:
+                        fs = inferred_fs
+                    if fs:
+                        add_node(fs, fs.capitalize(), 6, "l3.2")
+                        add_edge(code, fs)
+
+    # Confirm L3.2 feedstock node descriptions from FEEDSTOCKS dir
+    if os.path.exists(feedstocks_base):
+        for fname in os.listdir(feedstocks_base):
+            if not fname.endswith(".csv"):
+                continue
+            fs_id = fname.replace(".csv", "").upper()
+            if fs_id in nodes:
+                nodes[fs_id]["description"] = fs_id.lower()
+
+    # Active const_types from scenario zone.shp
+    active_const_types: list[str] = []
+    if scenario_name:
+        zone_path = os.path.join(SCENARIOS_DIR, f"{scenario_name}-scenario", "inputs", "building-geometry", "zone.shp")
+        if os.path.exists(zone_path):
+            try:
+                zone_gdf = gpd.read_file(zone_path)
+                active_const_types = list({str(v) for v in zone_gdf.get("const_type", []) if v and str(v).strip()})
+            except Exception as exc:
+                _techtree_logger.warning("TechTree: failed to read zone.shp for %s: %s", scenario_name, exc)
+
+    node_list = list(nodes.values())
+    _techtree_logger.info(
+        "TechTree: %d L0, %d L1, %d L2, %d L3 nodes, %d edges",
+        sum(1 for n in node_list if n["sublayer"] == "l0"),
+        sum(1 for n in node_list if n["sublayer"] == "l1"),
+        sum(1 for n in node_list if n["sublayer"].startswith("l2")),
+        sum(1 for n in node_list if n["sublayer"].startswith("l3")),
+        len(edges),
+    )
+    missing = [n["id"] for n in node_list if n["sublayer"] == "l1" and n["id"] not in {e["source"] for e in edges if e.get("field")}]
+    if missing:
+        _techtree_logger.warning("TechTree: %d L1 codes have no L1→L2 edge: %s", len(missing), missing[:10])
+
+    return {"active_const_types": active_const_types, "nodes": node_list, "edges": edges}
+
+
+@app.get("/api/techtree-graph")
+def get_techtree_graph(region: str = "DE", scenario_name: str = ""):
+    """Return full 4-layer construction hierarchy graph with active const_types from scenario."""
+    try:
+        return load_techtree_graph(region=region, scenario_name=scenario_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"TechTree graph failed: {exc}")
+
+
 @app.post("/api/chat")
 def chat(req: ChatRequest):
     """Proxy chat prompts to Ollama, supporting both /api/chat and /api/generate."""
@@ -1075,7 +1287,16 @@ def save_scenario(req: ExportCeaShpRequest):
         
         scenario_raw_name, scenario_path = normalize_scenario_name(req.scenario_name)
         prepare_scenario_structure(scenario_path, export_gdf, req.site_polygon)
-        
+
+        snapshot = {
+            "saved_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "scenario_name": scenario_raw_name,
+            "selected_geojson": req.selected_geojson,
+            "drawn_polygon": req.site_polygon,
+        }
+        with open(os.path.join(scenario_path, "scenario.json"), "w", encoding="utf-8") as _f:
+            json.dump(snapshot, _f)
+
         return {
             "success": True,
             "count": len(export_gdf),
@@ -1085,6 +1306,18 @@ def save_scenario(req: ExportCeaShpRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Save scenario failed: {e}")
+
+
+@app.get("/api/scenario-data/{scenario_name}")
+def get_scenario_data(scenario_name: str):
+    """Return the scenario.json snapshot for map/TechTree restore."""
+    _, scenario_path = normalize_scenario_name(scenario_name)
+    snapshot_path = os.path.join(scenario_path, "scenario.json")
+    if not os.path.exists(snapshot_path):
+        raise HTTPException(status_code=404, detail="scenario.json not found")
+    with open(snapshot_path, "r", encoding="utf-8") as _f:
+        return json.load(_f)
+
 
 @app.post("/api/select")
 def select_buildings(req: SelectRequest):

@@ -450,7 +450,8 @@ function MapView({
   constructionPhaseActive,
   onSelection,
   onConstructionAreaSelection,
-  onDrawnPolygonChange
+  onDrawnPolygonChange,
+  fitToGeoJSON,
 }) {
   const mapRef = useRef(null);
   const [viewState, setViewState] = useState({
@@ -555,6 +556,15 @@ function MapView({
     if (!geojson || hasFittedRef.current) return;
     fitMapToBounds();
   }, [geojson, fitMapToBounds]);
+
+  useEffect(() => {
+    if (!fitToGeoJSON || !mapLoaded) return;
+    const bounds = getBoundsFromGeoJSON(fitToGeoJSON);
+    if (!bounds) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    map.fitBounds(bounds, { padding: 80, maxZoom: 17, duration: 1200 });
+  }, [fitToGeoJSON, mapLoaded]);
 
   const has3DInitRef = useRef(false);
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import CollapsiblePanel from "./common/CollapsiblePanel.jsx";
+import { Collapse } from "react-collapse";
 import { fetchOllamaModels, sendChatMessage } from "../services/api.js";
 
 const INITIAL_MESSAGE = {
@@ -53,77 +53,76 @@ function ChatPanel({
   }, [chatInput, chatLoading, selectedModel]);
 
   return (
-    <CollapsiblePanel
-      positionClass="bottom-panel-left"
-      collapsed={leftCollapsed}
-      setCollapsed={setLeftCollapsed}
-      title="Chat"
-      titleSuffix={activeSelectionCount > 0 ? `Selected: ${activeSelectionCount}` : ""}
-      expandAriaLabel="Expand left panel"
-      collapseAriaLabel="Collapse left panel"
-    >
-      <div className="chatbot-section">
-        {availableModels.length > 0 && (
-          <div className="chat-model-row">
-            <span className="chat-model-label">LLM</span>
-            <select
-              className="chat-model-select"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-            >
-              {availableModels.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="chat-window" aria-live="polite">
-          {chatMessages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={[
-                "chat-message",
-                msg.role === "user" ? "chat-user" : "chat-assistant",
-              ].join(" ")}
-            >
-              <div className="chat-role">
-                {msg.role === "user" ? "You" : "Assistant"}
-              </div>
-              <div className="chat-text">{msg.text}</div>
-            </div>
-          ))}
-          {chatLoading && (
-            <div className="chat-message chat-assistant">
-              <div className="chat-role">Assistant</div>
-              <div className="chat-text">Thinking...</div>
+    <section className="bottom-panel-left" aria-label="Chat">
+      <div>
+        <button type="button" className="action-link" onClick={() => setLeftCollapsed(!leftCollapsed)}>
+          {leftCollapsed ? "Show Chat" : "Hide Chat"}
+        </button>
+      </div>
+      <Collapse isOpened={!leftCollapsed}>
+        <div className="chatbot-section">
+          {availableModels.length > 0 && (
+            <div className="chat-model-row">
+              <span className="chat-model-label">LLM</span>
+              <select
+                className="chat-model-select"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+              >
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
           )}
-          <div ref={bottomRef} />
-        </div>
 
-        {chatError && <div className="chat-error">{chatError}</div>}
+          <div className="chat-window" aria-live="polite">
+            {chatMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={[
+                  "chat-message",
+                  msg.role === "user" ? "chat-user" : "chat-assistant",
+                ].join(" ")}
+              >
+                <div className="chat-role">
+                  {msg.role === "user" ? "You" : "Assistant"}
+                </div>
+                <div className="chat-text">{msg.text}</div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="chat-message chat-assistant">
+                <div className="chat-role">Assistant</div>
+                <div className="chat-text">Thinking...</div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
 
-        <div className="chat-input-row">
-          <input
-            type="text"
-            className="chat-input"
-            placeholder="Type your message..."
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSendChat(); }}
-          />
-          <button
-            type="button"
-            className="chat-send-btn"
-            onClick={handleSendChat}
-            disabled={chatLoading || !chatInput.trim()}
-          >
-            Send
-          </button>
+          {chatError && <div className="chat-error">{chatError}</div>}
+
+          <div className="chat-input-row">
+            <input
+              type="text"
+              className="chat-input"
+              placeholder="Type your message..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSendChat(); }}
+            />
+            <button
+              type="button"
+              className="chat-send-btn"
+              onClick={handleSendChat}
+              disabled={chatLoading || !chatInput.trim()}
+            >
+              Send
+            </button>
+          </div>
         </div>
-      </div>
-    </CollapsiblePanel>
+      </Collapse>
+    </section>
   );
 }
 

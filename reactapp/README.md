@@ -1,6 +1,6 @@
 # ReactApp Workspace
 
-React + FastAPI prototype for map-based building selection, CEA archetype assignment, and end-to-end energy simulation, organised as a multi-page application accessed through a persistent left-dock navigation bar.
+React + FastAPI prototype for map-based building selection, CEA archetype assignment, end-to-end energy simulation, and interactive technology tree visualisation — organised as a multi-page application accessed through a persistent left-dock navigation bar.
 
 ## Folder Structure
 
@@ -39,18 +39,23 @@ The app uses a multi-page architecture where each workspace is a separate page c
 
 All pages are lazy-loaded and persistently mounted.
 
-- `buildingSelection.tsx` — Building Workspace. Contains all map-based selection logic, construction-phase feature definition, and selection confirmation workflow. Reports active selection state up to `App.tsx` via `onActiveSelectionChange` callback.
-- `techTree.tsx` — Tech Tree Workspace (placeholder).
+- `buildingSelection.tsx` — Building Workspace. Contains all map-based selection logic, construction-phase feature definition, and selection confirmation workflow. Reports active selection state up to `App.tsx` via `onActiveSelectionChange` callback. When a saved scenario is loaded, restores `confirmedSelection`, `buildingAssignments`, and `drawnPolygon` from `scenario.json` and propagates `activeConstTypes` to the Tech Tree.
+- `techTree.tsx` — Tech Tree Workspace. Renders the CEA construction-type dependency graph using **ReactFlow** and the **ELK** hierarchical layout engine.
+  - Fetches graph data from `/api/techtree-graph`; computes the set of active nodes by propagating `activeConstTypes` through graph edges.
+  - Only active nodes are passed to ELK (typically 5–25 in a collapsed view, 50–100 expanded), avoiding layout-engine overload.
+  - Collapsed sublayers (L2: Envelope / HVAC / Supply; L3: Conversion / Feedstocks) render as interactive pills showing the active node count; clicking a pill expands its nodes.
+  - Layer bands (L0 Typology / L1 Archetypes / L2 Assemblies / L3 Energy) are rendered as viewport-tracked coloured overlays using `useViewport()` from `@xyflow/react`, correctly following pan and zoom.
+  - ReactFlow is only mounted when the tab is active (`isActive` prop) to avoid the 0-size container warning.
 - `kpi.tsx` — KPI Workspace (placeholder).
 - `secap.tsx` — SECAP Workspace (placeholder).
 
 #### Components (`components/`)
 
-- `LeftDock.jsx` — Left sidebar tab bar. Accepts `activePage` and `onNavigate` props driven by the navigation state machine. Houses scenario controls: name input, save button, scenario chips with status dots (green = simulation complete, amber = inputs ready, grey = missing), run-simulation button, and a live simulation log panel.
+- `LeftDock.jsx` — Left sidebar tab bar. Accepts `activePage` and `onNavigate` props driven by the navigation state machine. Houses scenario controls: name input, save button, scenario chips with status dots (green = simulation complete, amber = inputs ready, grey = missing), run-simulation button, and a live simulation log panel. Clicking a scenario chip now loads its full state (map buildings, construction assignments, drawn polygon) from `scenario.json` and navigates to the Building Workspace.
 - `ChatPanel.jsx` — Self-contained floating chat panel. Owns all chat state (`chatMessages`, `chatInput`, `chatLoading`, `chatError`) and model state (`availableModels`, `selectedModel`). Fetches Ollama models on mount and renders a dropdown when multiple are available. No chat state in parent components.
 - `SelectionPanel.jsx` — Bottom-centre panel with selected buildings, confirm/reset actions, and building cards.
 - `RightPanel.jsx` — Right floating panel for construction-type feature definition, showing use-type and mapbox-type filtered refurbishment/detail/year-range options.
-- `MapView.jsx` — Map rendering and draw interaction. Frontend-side building selection using Mapbox `building` features, building-part parent resolution, CEA use-type mapping, and confirmed-selection colour states.
+- `MapView.jsx` — Map rendering and draw interaction. Frontend-side building selection using Mapbox `building` features, building-part parent resolution, CEA use-type mapping, and confirmed-selection colour states. Accepts a `fitToGeoJSON` prop that triggers an animated `fitBounds` camera move whenever the confirmed selection changes (scenario load or user-confirmed draw).
 - `components/common/`
   - `CollapsiblePanel.jsx` — Reusable shell for floating left/right bottom panels.
   - `LabeledSelectField.jsx` — Reusable labelled select control.
@@ -64,7 +69,7 @@ All pages are lazy-loaded and persistently mounted.
 
 #### Styles (`styles/`)
 
-Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `selection-panel.css`, `construction-panel.css`, `bottom-panels.css`, `common.css`, `base.css`, `_variables.css`.
+Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `selection-panel.css`, `construction-panel.css`, `bottom-panels.css`, `techtree.css`, `common.css`, `base.css`, `_variables.css`.
 
 ### Backend (FastAPI — `reactapp.py`)
 
@@ -75,12 +80,14 @@ Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `se
 | `GET` | `/api/construction-type-mapping` | Serves normalised construction-type decomposition rows from CSV. |
 | `GET` | `/api/scenarios` | Lists all scenario folders in `scenarios/`, stripping the `-scenario` suffix. |
 | `GET` | `/api/scenario-status/{name}` | Returns `complete` / `ready` / `incomplete` / `missing` based on filesystem markers. |
-| `POST` | `/api/save-scenario` | Saves building selection as CEA-4 compliant shapefiles in `scenarios/{name}-scenario/`. |
+| `GET` | `/api/scenario-data/{name}` | Returns the `scenario.json` snapshot (GeoJSON + drawn polygon) for full client state restore. |
+| `POST` | `/api/save-scenario` | Saves building selection as CEA-4 compliant shapefiles + `scenario.json` snapshot in `scenarios/{name}-scenario/`. |
 | `POST` | `/api/export-cea-shp` | Converts selected GeoJSON into a CEA-4 shapefile ZIP for download. |
 | `POST` | `/api/select` | Backend selection endpoint based on drawn geometry (SHP workflow). |
 | `POST` | `/api/chat` | Forwards prompts to Ollama with the requested model (`req.model`). |
 | `GET` | `/api/ollama-models` | Returns list of locally available Ollama models. |
 | `GET` | `/api/run-simulation` | SSE stream: runs the 8-step CEA pipeline for a named scenario. |
+| `GET` | `/api/techtree-graph` | Returns the CEA technology graph (nodes + edges + `active_const_types`) for the Tech Tree visualisation. Accepts `?scenario_name=&region=DE`. |
 
 ---
 
@@ -144,10 +151,12 @@ A separate `typology.dbf` (CEA-3 format) is no longer written.
 
 ## Scenario Management
 
-- Saved scenarios are listed in the left dock under the Building Workspace tab with colour-coded status dots.
+- Saved scenarios are listed in the left dock with colour-coded status dots.
 - On app load, `GET /api/scenarios` populates the list; `GET /api/scenario-status/{name}` fetches each status.
-- Saving a new scenario via `POST /api/save-scenario` prepends it to the list immediately.
-- Status is re-fetched whenever the scenario list changes.
+- Saving a new scenario via `POST /api/save-scenario` prepends it to the list immediately and writes:
+  - `inputs/building-geometry/zone.shp` + `site.shp` — CEA-4 compliant geometry
+  - `scenario.json` — full client state snapshot (`selected_geojson` with all assignment properties, `drawn_polygon`, timestamp)
+- **Scenario restore**: clicking a chip calls `GET /api/scenario-data/{name}` to fetch `scenario.json`, then restores `confirmedSelection`, `buildingAssignments`, and `drawnPolygon` in the frontend. The map animates to fit the selection bounds; the Tech Tree highlights the active construction types. Scenarios without `scenario.json` (saved before this feature) still work for simulation — the restore step fails silently.
 - Folder convention: `scenarios/{name}-scenario/` on disk; display name is `{name}`.
 - Status markers: `zone.shp` present → `ready`; `outputs/data/demand/Total_demand.csv` present → `complete`.
 
@@ -212,6 +221,7 @@ Frontend (`frontend/.env` if needed):
 - Navigation state lives in `states/navigationMachine.ts` (reducer) + `hooks/useNavigation.ts` (hook).
 - Scenario management and simulation state live in `App.tsx` so the LeftDock controls are accessible from any page.
 - Active selection state lives in `buildingSelection.tsx` and is surfaced to `App.tsx` via a callback ref (`onActiveSelectionChange`) to avoid unnecessary re-renders.
+- Derived state in `buildingSelection.tsx` (`lockedSelectionGeoJSONWithState`, `confirmedBuildingsWithAssignments`) must be `useMemo`-ised — inline object creation on every render caused an infinite re-render loop via the `onConstTypesChange` callback chain.
 - `ChatPanel.jsx` is fully self-contained — do not hoist chat or model state into parent components.
 - TypeScript is configured via `tsconfig.json` with `allowJs: true` so `.jsx` files coexist with `.tsx` without migration.
 - `vite-env.d.ts` provides `import.meta.env` types for Vite.
@@ -219,3 +229,5 @@ Frontend (`frontend/.env` if needed):
 - Keep mapping CSVs as source-of-truth; avoid hardcoding category logic in components.
 - The construction mapping parser tolerates CSV header variations (BOM, key-format differences).
 - CEA CLI flags use bare parameter names, not the `section:parameter` config format — `archetypes_mapper` reads from `zone.shp` directly via `get_zone_geometry()`, so all typology columns must be present in that file.
+- Tech Tree must only pass **active** nodes to ELK — passing all ~1 000 CEA nodes freezes the layout engine. Filter in `buildVisibleGraph` before calling `runElkLayout`.
+- `LayerOverlays` in `techTree.tsx` must be a child of `<ReactFlow>` (not a sibling) to access the `useViewport()` context for correct canvas-to-screen coordinate mapping.
