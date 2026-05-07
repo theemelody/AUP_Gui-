@@ -18,14 +18,17 @@ import type { ActiveSelectionInfo } from '../pages/buildingSelection';
 import type { PageId } from '../states/navigationMachine';
 
 type StepStatus = 'idle' | 'running' | 'done' | 'error';
-type LogEntry = { step: string; status: StepStatus; messages: string[] };
+type LogEntry = { step: string; status: StepStatus; messages: string[]; startedAt?: number; finishedAt?: number };
 type SimStatus = 'idle' | 'running' | 'done' | 'failed';
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 export type ScenarioStatus = 'complete' | 'ready' | 'incomplete' | 'missing';
 
 export interface LoadedScenario {
   geojson: unknown;
   drawnPolygon: unknown;
 }
+
+export type SimProfile = 'demand' | 'lifecycle' | 'renewables' | 'network' | 'full';
 
 export interface ScenarioContextValue {
   scenarioName: string;
@@ -36,7 +39,13 @@ export interface ScenarioContextValue {
   scenarioStatuses: Record<string, ScenarioStatus>;
   simulationLog: LogEntry[];
   simulationStatus: SimStatus;
+  simulationTotal: number;
+  simProfile: SimProfile;
+  setSimProfile: (p: SimProfile) => void;
   loadedScenario: LoadedScenario | null;
+  saveStatus: SaveStatus;
+  saveStartedAt: number | null;
+  saveDuration: number | null;
   // Actions
   saveScenario: () => Promise<void>;
   selectScenarioForSim: (name: string) => Promise<void>;
@@ -67,7 +76,12 @@ export function ScenarioProvider({
   const [scenarioStatuses, setScenarioStatuses] = useState<Record<string, ScenarioStatus>>({});
   const [simulationLog, setSimulationLog] = useState<LogEntry[]>([]);
   const [simulationStatus, setSimulationStatus] = useState<SimStatus>('idle');
+  const [simulationTotal, setSimulationTotal] = useState(0);
+  const [simProfile, setSimProfile] = useState<SimProfile>('demand');
   const [loadedScenario, setLoadedScenario] = useState<LoadedScenario | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveStartedAt, setSaveStartedAt] = useState<number | null>(null);
+  const [saveDuration, setSaveDuration] = useState<number | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   // Load saved scenarios on mount
@@ -97,6 +111,10 @@ export function ScenarioProvider({
       alert('Please select buildings first before saving a scenario.');
       return;
     }
+    const startedAt = Date.now();
+    setSaveStatus('saving');
+    setSaveStartedAt(startedAt);
+    setSaveDuration(null);
     try {
       const result = await saveScenarioBuildings(
         sel.selectedGeoJSON,
@@ -104,6 +122,8 @@ export function ScenarioProvider({
         getDrawnPolygon(),
       );
       if (result.success) {
+        setSaveStatus('saved');
+        setSaveDuration(Date.now() - startedAt);
         setSavedScenarios((prev: string[]) =>
           prev.includes(name) ? prev : [name, ...prev].slice(0, 8),
         );
@@ -111,9 +131,10 @@ export function ScenarioProvider({
         fetchScenarioStatus(name).then((status) =>
           setScenarioStatuses((prev) => ({ ...prev, [name]: status as ScenarioStatus })),
         );
-        alert(`Scenario '${name}' saved successfully to ${result.scenario_path}`);
       }
     } catch (e) {
+      setSaveStatus('failed');
+      setSaveDuration(Date.now() - startedAt);
       alert((e as Error)?.message || 'Failed to save scenario');
     }
   }, [scenarioName, getActiveSelection, getDrawnPolygon]);
@@ -138,12 +159,19 @@ export function ScenarioProvider({
     esRef.current?.close();
     setSimulationLog([]);
     setSimulationStatus('running');
+    setSimulationTotal(0);
 
-    const es = new EventSource(`/api/run-simulation?scenario_name=${encodeURIComponent(name)}`);
+    const es = new EventSource(`/api/run-simulation?scenario_name=${encodeURIComponent(name)}&profile=${simProfile}`);
     esRef.current = es;
 
     es.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
+      const now = Date.now();
+
+      if (data.total != null) {
+        setSimulationTotal(data.total);
+        return;
+      }
 
       if (data.status === 'complete' || data.status === 'failed') {
         setSimulationStatus(data.status === 'complete' ? 'done' : 'failed');
@@ -156,20 +184,23 @@ export function ScenarioProvider({
 
       setSimulationLog((prev) => {
         const idx = prev.findIndex((e) => e.step === data.step);
-        const entry: LogEntry =
-          idx >= 0
-            ? {
-                ...prev[idx],
-                status: data.status,
-                messages: data.message
-                  ? [...prev[idx].messages, data.message]
-                  : prev[idx].messages,
-              }
-            : {
-                step: data.step,
-                status: data.status,
-                messages: data.message ? [data.message] : [],
-              };
+        const existing = idx >= 0 ? prev[idx] : null;
+        const isFinished = data.status === 'done' || data.status === 'error';
+        const entry: LogEntry = existing
+          ? {
+              ...existing,
+              status: data.status,
+              messages: data.message ? [...existing.messages, data.message] : existing.messages,
+              startedAt: existing.startedAt ?? (data.status === 'running' ? now : undefined),
+              finishedAt: isFinished ? now : existing.finishedAt,
+            }
+          : {
+              step: data.step,
+              status: data.status,
+              messages: data.message ? [data.message] : [],
+              startedAt: data.status === 'running' ? now : undefined,
+              finishedAt: isFinished ? now : undefined,
+            };
         if (idx >= 0) {
           const next = [...prev];
           next[idx] = entry;
@@ -183,7 +214,7 @@ export function ScenarioProvider({
       setSimulationStatus('failed');
       es.close();
     };
-  }, [selectedScenarioForSim]);
+  }, [selectedScenarioForSim, simProfile]);
 
   const value = useMemo<ScenarioContextValue>(
     () => ({
@@ -195,14 +226,21 @@ export function ScenarioProvider({
       scenarioStatuses,
       simulationLog,
       simulationStatus,
+      simulationTotal,
+      simProfile,
+      setSimProfile,
       loadedScenario,
+      saveStatus,
+      saveStartedAt,
+      saveDuration,
       saveScenario,
       selectScenarioForSim,
       runSimulation,
     }),
     [
       scenarioName, confirmedScenarioName, savedScenarios, selectedScenarioForSim,
-      scenarioStatuses, simulationLog, simulationStatus, loadedScenario,
+      scenarioStatuses, simulationLog, simulationStatus, simulationTotal, simProfile,
+      loadedScenario, saveStatus, saveStartedAt, saveDuration,
       saveScenario, selectScenarioForSim, runSimulation,
     ],
   );

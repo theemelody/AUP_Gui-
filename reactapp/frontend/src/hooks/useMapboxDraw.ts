@@ -8,6 +8,7 @@ import {
 
 interface UseMapboxDrawOptions {
   mapRef: React.RefObject<MapRef | null>;
+  mapLoaded: boolean;
   selectionLocked: boolean;
   constructionPhaseActive: boolean;
   lockedSelectionGeoJSON: unknown;
@@ -19,6 +20,7 @@ interface UseMapboxDrawOptions {
 
 export function useMapboxDraw({
   mapRef,
+  mapLoaded,
   selectionLocked,
   constructionPhaseActive,
   lockedSelectionGeoJSON,
@@ -46,6 +48,7 @@ export function useMapboxDraw({
   useEffect(() => { onDrawnPolygonChangeRef.current = onDrawnPolygonChange; }, [onDrawnPolygonChange]);
 
   const ensureDrawControl = useCallback(() => {
+    if (!mapLoaded) return;
     const map = mapRef.current?.getMap?.();
     if (!map || drawRef.current) return;
 
@@ -123,7 +126,7 @@ export function useMapboxDraw({
     map.on("draw.create", handleChange);
     map.on("draw.update", handleChange);
     map.on("draw.delete", () => fireSelection(null));
-  }, [mapRef, ensureMappingLoaded]);
+  }, [mapRef, mapLoaded, ensureMappingLoaded]);
 
   // Initialize draw control and clean up debounce on unmount.
   useEffect(() => {

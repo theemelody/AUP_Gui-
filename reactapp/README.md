@@ -53,12 +53,19 @@ All pages are lazy-loaded and persistently mounted.
   - Collapsed sublayers (L2: Envelope / HVAC / Supply; L3: Conversion / Feedstocks) render as interactive pills showing the active node count; clicking a pill expands its nodes.
   - Layer bands (L0 Typology / L1 Archetypes / L2 Assemblies / L3 Energy) are rendered as viewport-tracked coloured overlays using `useViewport()` from `@xyflow/react`, correctly following pan and zoom.
   - ReactFlow is only mounted when the tab is active (`isActive` prop) to avoid the 0-size container warning.
-- `kpi.tsx` — KPI Workspace (placeholder).
+- `kpi.tsx` — KPI Workspace. Full dashboard with five tab-switched views, each driven by `GET /api/kpi-data/{scenario_name}`:
+  - **Demand** — 8 charts: annual end-use stacked bar, EUI per building with NZEB 200 benchmark line, peak load grouped bar, monthly demand bar, 3 load-duration curve panels (heating / cooling / electricity), hourly load curve stacked bar + operative temperature line, monthly thermal balance (gains/losses), monthly solar radiation by surface orientation.
+  - **SECAP** — SECAP compliance KPI cards and charts derived from demand outputs.
+  - **Emissions & Costs** — Annual GHG tCO₂-eq and CAPEX/OPEX stacked bars (locked until Profile B is run; `ChartCard locked` state shows padlock overlay).
+  - **Tech Potentials** — PV vs total demand, PVT + SC thermal bar, renewable-mix donut, geothermal capacity, sewage heat (locked until Profile C).
+  - **Thermal Networks** — Network demand-duration curve and per-pipe metrics (locked until Profile D).
+  - Tab buttons show a lock icon when the required simulation profile has not been run; clicking a locked tab does nothing.
 - `secap.tsx` — SECAP Workspace (placeholder).
 
 #### Components (`components/`)
 
-- `LeftDock.tsx` — Left sidebar tab bar. Reads all scenario state from `ScenarioContext` (4 props only: `sidebarHidden`, `activePage`, `onNavigate`, `hasSelection`). Houses scenario controls: name input, save button, scenario chips with status dots, run-simulation button, and a live simulation log panel. Clicking a chip loads the full saved state and navigates to Building Workspace.
+- `LeftDock.tsx` — Left sidebar tab bar. Reads all scenario state from `ScenarioContext` (4 props only: `sidebarHidden`, `activePage`, `onNavigate`, `hasSelection`). Houses: simulation profile selector (A–E dropdown), scenario name input, save button with live save-duration display, scenario chips with status dots, run-simulation button, and a live simulation log panel with per-step HH:MM:SS elapsed timers. Clicking a chip loads the full saved state and navigates to Building Workspace. Profile labels: A — Demand Forecast, B — Lifecycle Assessment, C — Renewable Potentials, D — District Network, E — Full Assessment.
+- `ChartCard.tsx` — Reusable chart card wrapper. Props: `title`, `subtitle?`, `height?`, `locked?`, `lockMessage?`, `wide?`. When `locked=true` renders a padlock SVG overlay at the chart height instead of children. Used by all KPI tab components.
 - `ChatPanel.tsx` — Self-contained floating chat panel. Owns all chat state and Ollama model state. No chat state in parent components.
 - `SelectionPanel.tsx` — Bottom-centre panel with selected buildings, confirm/reset actions, and building cards.
 - `RightPanel.tsx` — Right floating panel for construction-type feature definition. Cascade dropdowns (refurbishment → detail → year range) unified into a single `handleCascadeChange(useType, mapboxType, field, value)` handler.
@@ -69,7 +76,8 @@ All pages are lazy-loaded and persistently mounted.
 
 #### Services & Utilities
 
-- `services/api.ts` — Typed API client wrappers for all backend endpoints.
+- `services/api.ts` — Typed API client wrappers for all backend endpoints. Exports `fetchKpiData(scenarioName)` → `Promise<KpiData>`, with `KpiData` and `KpiAnnualRow` interfaces covering all fields returned by `/api/kpi-data/`.
+- `utils/kpiColors.ts` — `KPI_COLORS` map (heating/cooling/electricity/solar/GHG/cost + orientation shades + thermal-balance keys); `FIELD_LABELS` map (CEA column names → human-readable strings); `removeZeroSeries()` helper that strips series whose absolute sum is below 1e-4.
 - `utils/selection.ts` — GeoJSON parsing, stable feature keys, Mapbox type normalisation.
 - `utils/mapbox.js` — Mapbox building helpers (type extraction, feature normalisation, selection logic) and layer definitions (fill, outline, extrusion).
 - `vite-env.d.ts` — Vite `import.meta.env` types + ambient declarations for `@mapbox/mapbox-gl-draw` and `react-collapse`.
@@ -83,13 +91,14 @@ Token-driven CSS design system — all colors, spacing, radii, and transitions l
 | `_variables.css` | All design tokens (colors, spacing, radii, blur, transitions, button variants) |
 | `base.css` | HTML/body reset, global form element styles |
 | `layout.css` | App grid, map container, sidebar toggle |
-| `left-dock.css` | Left sidebar header, tabs, scenario chips, simulation log |
+| `left-dock.css` | Left sidebar header, tabs, scenario chips, simulation log, profile selector |
 | `chat-panel.css` | Floating chat window, messages, input bar |
 | `bottom-panels.css` | Floating panel container shell (selection + construction) |
 | `selection-panel.css` | Selected buildings list and building cards |
 | `construction-panel.css` | Construction phase UI, cascade dropdowns |
 | `common.css` | Shared button/input base classes, status indicators, utility classes |
 | `techtree.css` | Tech Tree ReactFlow canvas, layer bands, node pills |
+| `kpi.css` | KPI page layout, tab bar, chart-card grid, locked state overlay |
 
 The app has two visual zones with distinct aesthetics:
 
@@ -113,16 +122,27 @@ Button tokens (`--btn-dark-*`, `--btn-light-*`, `--btn-primary-*`, `--btn-succes
 | `POST` | `/api/select` | Backend selection endpoint based on drawn geometry (SHP workflow only; dead if `USE_MAPBOX_BUILDINGS=true`). |
 | `POST` | `/api/chat` | Forwards prompts to Ollama with the requested model (`req.model`). |
 | `GET` | `/api/ollama-models` | Returns list of locally available Ollama models. |
-| `GET` | `/api/run-simulation` | SSE stream: runs the 8-step CEA pipeline for a named scenario. |
-| `GET` | `/api/techtree-graph` | Returns the CEA technology graph (nodes + edges + `active_const_types`) for the Tech Tree visualisation. Accepts `?scenario_name=&region=DE`. |
+| `GET` | `/api/run-simulation` | SSE stream: runs the CEA pipeline for a named scenario. Accepts `?profile=demand\|lifecycle\|renewables\|network\|full` (default `demand`). |
+| `GET` | `/api/kpi-data/{name}` | Returns aggregated KPI data from CEA output CSVs: `annual` (per-building totals), `monthly` (12-month demand), `monthly_balance` (thermal gains/losses), `load_duration` (sorted hourly curves), `hourly_sample` (every 6th hour), `solar_radiation` (by surface orientation), `emissions`, `costs`, `potentials`, `network`. Each key is `null` if the required output file doesn't exist; `available[]` lists which data groups are present. |
+| `GET` | `/api/techtree-graph` | Returns the CEA technology graph with per-building linkage: each node carries `buildings[]` (list of building names that use it). Accepts `?scenario_name=&region=DE`. |
 
 ---
 
-## CEA Simulation Pipeline
+## CEA Simulation Profiles
 
-`GET /api/run-simulation?scenario_name=…` streams progress via **Server-Sent Events**. Each event is a JSON object `{ step, status, message? }`. The final event is `{ status: "complete" }` or `{ status: "failed" }`.
+`GET /api/run-simulation?scenario_name=…&profile=…` streams progress via **Server-Sent Events**. Each event is a JSON object `{ step, status, message? }`. The final event is `{ status: "complete" }` or `{ status: "failed" }`. The `profile` parameter controls which steps run:
 
-Steps run in order, each as a subprocess of the CEA binary at `CEA_CMD` (default: `cea`; override via env var):
+| Profile | Steps |
+| --- | --- |
+| `demand` (A — default) | database-helper → archetypes-mapper → surroundings-helper → terrain-helper → weather-helper → radiation → occupancy → demand |
+| `lifecycle` (B) | Profile A + emissions + system-costs |
+| `renewables` (C) | Profile A's radiation + photovoltaic + photovoltaic-thermal + solar-collector + shallow-geothermal-potential + sewage-potential |
+| `network` (D) | Profile A + network-layout + thermal-network |
+| `full` (E) | All steps from A+B+C+D |
+
+All steps run as subprocesses of the CEA binary at `CEA_CMD` (default: `cea`; override via env var). CLI flags use bare parameter names, not `section:parameter` config format.
+
+### Per-step reference (Profile A)
 
 | Step | CEA command | What it does |
 | --- | --- | --- |
@@ -133,7 +153,11 @@ Steps run in order, each as a subprocess of the CEA binary at `CEA_CMD` (default
 | `weather-helper` | `cea weather-helper` | Downloads EPW weather file for the scenario location. |
 | `radiation` | `cea radiation --multiprocessing true` | Computes solar radiation via DAYSIM (slow: 5–30 min). |
 | `occupancy` | `cea occupancy --multiprocessing true` | Generates hourly schedule profiles per building. |
-| `demand` | `cea demand --multiprocessing true` | Computes hourly energy demand → `Total_demand.csv`. |
+| `demand` | `cea demand --multiprocessing true` | Computes hourly energy demand → `Total_demand.csv` + `Total_demand_hourly.csv`. |
+
+### Simplified LCA helper
+
+`run_simplified_lca.py` is a standalone script for Profile B that runs `lca_embodied()` directly via the CEA Python API (bypasses the broken `emissions_simplified` config path). Run as: `python run_simplified_lca.py /path/to/scenario`. Writes embodied LCA results plus a stub operational CSV so the KPI endpoint can detect that the emissions step has been attempted.
 
 CLI flags use bare parameter names (`--scenario`, `--databases-path`, `--multiprocessing`), not the `section:parameter` format used in config files.
 
@@ -260,3 +284,7 @@ Frontend (`frontend/.env` if needed):
 - CEA CLI flags use bare parameter names, not the `section:parameter` config format — `archetypes_mapper` reads from `zone.shp` directly via `get_zone_geometry()`, so all typology columns must be present in that file.
 - Tech Tree must only pass **active** nodes to ELK — passing all ~1 000 CEA nodes freezes the layout engine. Filter in `buildVisibleGraph` before calling `runElkLayout`.
 - `LayerOverlays` in `techTree.tsx` must be a child of `<ReactFlow>` (not a sibling) to access the `useViewport()` context for correct canvas-to-screen coordinate mapping.
+- `prepare_scenario_structure()` in `reactapp.py` applies three geometry repairs before writing `zone.shp`: (1) MultiPolygon → largest polygon; (2) `buffer(0)` repair for self-intersecting rings; (3) drop buildings with projected footprint < 10 m² (CEA demand divides by floor area and NaN-crashes on near-zero footprints).
+- KPI charts use `echarts-for-react` + ECharts 6. Always set a fixed `height` style on `ReactECharts` — the container must have a non-zero height or ECharts renders blank. Use `removeZeroSeries()` before passing `series` to avoid rendering ghost legend entries for unused energy carriers.
+- The `ScenarioContext` exposes `simProfile` / `setSimProfile` for profile selection and `saveStatus` / `saveStartedAt` / `saveDuration` for save-feedback UX. `LeftDock` reads these directly — no prop drilling needed.
+- `alert()` on successful save has been removed; the save button now shows a live HH:MM:SS counter while saving and switches to a "Saved" state on completion.

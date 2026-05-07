@@ -1,18 +1,45 @@
+import { useEffect, useState } from 'react';
 import LeftDockTab from './common/LeftDockTab.jsx';
 import { useScenarioContext } from '../context/ScenarioContext';
+import type { SimProfile } from '../context/ScenarioContext';
 import type { PageId } from '../states/navigationMachine';
+
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
 
 const STEP_ICON: Record<string, string> = { idle: '○', running: '⟳', done: '✓', error: '✗' };
 const STEP_LABEL: Record<string, string> = {
-  'database-helper':     'Load databases',
-  'archetypes-mapper':   'Map archetypes',
-  'surroundings-helper': 'Fetch surroundings',
-  'terrain-helper':      'Fetch terrain',
-  'weather-helper':      'Fetch weather',
-  'radiation':           'Solar radiation',
-  'occupancy':           'Occupancy profiles',
-  'demand':              'Energy demand',
+  'database-helper':              'Load databases',
+  'archetypes-mapper':            'Map archetypes',
+  'surroundings-helper':          'Fetch surroundings',
+  'terrain-helper':               'Fetch terrain',
+  'weather-helper':               'Fetch weather',
+  'radiation':                    'Solar radiation',
+  'occupancy':                    'Occupancy profiles',
+  'demand':                       'Energy demand',
+  'emissions':                    'Lifecycle emissions',
+  'system-costs':                 'System costs',
+  'photovoltaic':                 'PV potential',
+  'photovoltaic-thermal':         'PVT potential',
+  'solar-collector':              'Solar collector',
+  'shallow-geothermal-potential': 'Geothermal potential',
+  'sewage-potential':             'Sewage heat',
+  'network-layout':               'Network layout',
+  'thermal-network':              'Thermal network',
 };
+
+const PROFILE_OPTIONS: { value: SimProfile; label: string }[] = [
+  { value: 'demand',     label: 'A — Demand Forecast' },
+  { value: 'lifecycle',  label: 'B — Lifecycle Assessment' },
+  { value: 'renewables', label: 'C — Renewable Potentials' },
+  { value: 'network',    label: 'D — District Network' },
+  { value: 'full',       label: 'E — Full Assessment' },
+];
 
 interface ScenarioChipProps {
   name: string;
@@ -52,8 +79,19 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
   const {
     scenarioName, setScenarioName, saveScenario,
     savedScenarios, selectedScenarioForSim, selectScenarioForSim,
-    scenarioStatuses, runSimulation, simulationLog, simulationStatus,
+    scenarioStatuses, runSimulation, simulationLog, simulationStatus, simulationTotal,
+    simProfile, setSimProfile,
+    saveStatus, saveStartedAt, saveDuration,
   } = useScenarioContext();
+
+  // Tick every second to refresh live durations while saving or simulating.
+  const [, setTick] = useState(0);
+  const needsTick = saveStatus === 'saving' || simulationStatus === 'running';
+  useEffect(() => {
+    if (!needsTick) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [needsTick]);
 
   return (
     <aside className={['left-dock', sidebarHidden ? 'is-hidden' : ''].filter(Boolean).join(' ')}>
@@ -81,11 +119,30 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
                 type="button"
                 className="scenario-save-btn"
                 onClick={saveScenario}
-                disabled={!scenarioName.trim() || !hasSelection}
+                disabled={!scenarioName.trim() || !hasSelection || saveStatus === 'saving'}
               >
                 Save
               </button>
             </div>
+            {saveStatus !== 'idle' && (
+              <div className="save-status-log">
+                {saveStatus === 'saving' && saveStartedAt != null && (
+                  <span className="save-status-saving">
+                    ⟳ Saving {formatDuration(Date.now() - saveStartedAt)}
+                  </span>
+                )}
+                {saveStatus === 'saved' && (
+                  <span className="save-status-saved">
+                    ✓ Saved {formatDuration(saveDuration ?? 0)}
+                  </span>
+                )}
+                {saveStatus === 'failed' && (
+                  <span className="save-status-failed">
+                    ✗ Failed {formatDuration(saveDuration ?? 0)}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="saved-scenarios-inline">
               {savedScenarios.length === 0 ? (
@@ -103,6 +160,19 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
               )}
             </div>
 
+            <div className="left-dock-section-title" style={{ marginTop: 8 }}>Simulation profile</div>
+            <select
+              className="scenario-input"
+              value={simProfile}
+              onChange={(e) => setSimProfile(e.target.value as SimProfile)}
+              disabled={simulationStatus === 'running'}
+              style={{ width: '100%', marginBottom: 8 }}
+            >
+              {PROFILE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
             <button
               type="button"
               className="left-dock-run-btn"
@@ -112,24 +182,61 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
               {simulationStatus === 'running' ? 'Running…' : 'Run simulation'}
             </button>
 
+            {simulationStatus !== 'idle' && simulationTotal > 0 && (() => {
+              const done = simulationLog.filter((e) => e.status === 'done' || e.status === 'error').length;
+              const pct = Math.round((done / simulationTotal) * 100);
+              const fillClass = simulationStatus === 'done' ? 'is-done' : simulationStatus === 'failed' ? 'is-failed' : '';
+              return (
+                <div className="sim-progress">
+                  <div className="sim-progress-track">
+                    <div className={`sim-progress-fill ${fillClass}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="sim-progress-label">
+                    <span>{done} / {simulationTotal} steps</span>
+                    <span>{pct}%</span>
+                  </div>
+                </div>
+              );
+            })()}
             {simulationStatus !== 'idle' && (
               <div className="simulation-log">
-                {simulationLog.map((entry) => (
-                  <div key={entry.step} className={`sim-log-entry sim-log-${entry.status}`}>
-                    <div className="sim-log-row">
-                      <span className="sim-log-icon">{STEP_ICON[entry.status]}</span>
-                      <span className="sim-log-label">{STEP_LABEL[entry.step] ?? entry.step}</span>
-                    </div>
-                    {entry.status === 'error' && entry.messages.length > 0 && (
-                      <div className="sim-log-detail">
-                        {entry.messages[entry.messages.length - 1]}
+                {simulationLog.map((entry) => {
+                  const elapsed =
+                    entry.finishedAt && entry.startedAt
+                      ? entry.finishedAt - entry.startedAt
+                      : entry.status === 'running' && entry.startedAt
+                      ? Date.now() - entry.startedAt
+                      : null;
+                  return (
+                    <div key={entry.step} className={`sim-log-entry sim-log-${entry.status}`}>
+                      <div className="sim-log-row">
+                        <span className="sim-log-icon">{STEP_ICON[entry.status]}</span>
+                        <span className="sim-log-label">{STEP_LABEL[entry.step] ?? entry.step}</span>
+                        {elapsed != null && (
+                          <span className="sim-log-time">{formatDuration(elapsed)}</span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
-                {simulationStatus === 'done' && (
-                  <div className="sim-log-complete">Simulation complete</div>
-                )}
+                      {entry.status === 'error' && entry.messages.length > 0 && (
+                        <div className="sim-log-detail">
+                          {entry.messages[entry.messages.length - 1]}
+                        </div>
+                      )}
+                      {entry.status === 'done' && entry.messages.some((m) => m.includes('skipped')) && (
+                        <div className="sim-log-detail" style={{ opacity: 0.55 }}>skipped</div>
+                      )}
+                    </div>
+                  );
+                })}
+                {simulationStatus === 'done' && (() => {
+                  const total = simulationLog.reduce(
+                    (acc, e) => acc + (e.startedAt && e.finishedAt ? e.finishedAt - e.startedAt : 0), 0,
+                  );
+                  return (
+                    <div className="sim-log-complete">
+                      Simulation complete {formatDuration(total)}
+                    </div>
+                  );
+                })()}
                 {simulationStatus === 'failed' && (
                   <div className="sim-log-failed">Simulation failed</div>
                 )}
@@ -153,7 +260,15 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
           active={activePage === 'kpi'}
           onActivate={() => onNavigate('kpi')}
         >
-          <div className="left-dock-empty-panel">KPI controls will appear here.</div>
+          <div className="left-dock-section">
+            {selectedScenarioForSim ? (
+              <div className="left-dock-muted" style={{ fontSize: 11 }}>
+                Viewing: <strong>{selectedScenarioForSim}</strong>
+              </div>
+            ) : (
+              <div className="left-dock-muted">Select a scenario in Building Workspace to view KPIs.</div>
+            )}
+          </div>
         </LeftDockTab>
 
         <LeftDockTab

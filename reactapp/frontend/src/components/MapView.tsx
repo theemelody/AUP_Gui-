@@ -68,6 +68,7 @@ function MapView({
 
   useMapboxDraw({
     mapRef,
+    mapLoaded,
     selectionLocked,
     constructionPhaseActive,
     lockedSelectionGeoJSON: normalizedLockedSelectionGeoJSON,

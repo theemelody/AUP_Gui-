@@ -7,6 +7,7 @@ import tempfile
 import os
 import base64
 import requests
+import pandas as pd
 from io import BytesIO
 
 import geopandas as gpd
@@ -21,6 +22,7 @@ load_dotenv()
 
 import logging
 logging.basicConfig(level=logging.INFO)
+_logger = logging.getLogger(__name__)
 
 app = FastAPI()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -122,6 +124,14 @@ ASSEMBLY_FAMILY_TO_FILE = {
     "SUPPLY_COOLING":     ("SUPPLY",   "SUPPLY_COOLING.csv"),
     "SUPPLY_ELECTRICITY": ("SUPPLY",   "SUPPLY_ELECTRICITY.csv"),
 }
+
+# Columns in building-properties CSVs that contain assembly codes, grouped by file.
+_PROPS_FILES_COLS: list[tuple[str, list[str]]] = [
+    ("envelope.csv", ["type_wall", "type_roof", "type_win", "type_floor", "type_base",
+                      "type_shade", "type_mass", "type_leak", "type_part"]),
+    ("hvac.csv",     ["hvac_type_hs", "hvac_type_cs", "hvac_type_dhw", "hvac_type_ctrl", "hvac_type_vent"]),
+    ("supply.csv",   ["supply_type_hs", "supply_type_dhw", "supply_type_cs", "supply_type_el"]),
+]
 
 FUEL_CODE_TO_FEEDSTOCK = {
     "Cgas":   "NATURALGAS",
@@ -358,8 +368,11 @@ def _build_zone_record(row) -> dict:
 
     Reference: cea/datamanagement/format_helper/cea4_verify.py COLUMNS_ZONE_4
     """
+    geom = row["geometry"]
+    if geom is not None and geom.geom_type == "MultiPolygon":
+        geom = max(geom.geoms, key=lambda p: p.area)
     return {
-        "geometry":   row["geometry"],
+        "geometry":   geom,
         "name":       row["name"],
         "floors_bg":  int(row.get("floors_bg", 0)),
         "floors_ag":  int(row["floors_ag"]),
@@ -393,6 +406,29 @@ def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
 
     zone_data = [_build_zone_record(row) for _, row in zone_gdf.iterrows()]
     zone_gdf_cleaned = gpd.GeoDataFrame(zone_data, crs=zone_gdf.crs)
+
+    # Fix self-intersecting polygons (buffer(0) is the standard shapely repair).
+    invalid_mask = ~zone_gdf_cleaned.geometry.is_valid
+    if invalid_mask.any():
+        zone_gdf_cleaned.loc[invalid_mask, "geometry"] = (
+            zone_gdf_cleaned.loc[invalid_mask, "geometry"].apply(lambda g: g.buffer(0))
+        )
+        _logger.warning("Repaired %d invalid geometry(ies) in zone.shp", invalid_mask.sum())
+
+    # Drop buildings whose projected footprint is too small — CEA's RC thermal
+    # model divides by floor area and NaN-crashes with near-zero footprints.
+    MIN_FOOTPRINT_M2 = 10.0
+    small_mask = zone_gdf_cleaned.geometry.area < MIN_FOOTPRINT_M2
+    if small_mask.any():
+        _logger.warning(
+            "Dropped %d building(s) with footprint < %.0f m² before writing zone.shp "
+            "(would cause CEA demand NaN convergence failure).",
+            small_mask.sum(), MIN_FOOTPRINT_M2,
+        )
+        zone_gdf_cleaned = zone_gdf_cleaned[~small_mask].copy()
+
+    if zone_gdf_cleaned.empty:
+        raise ValueError("No valid buildings remain after geometry filtering — all footprints were < 10 m².")
 
     # Write zone.shp
     zone_path = os.path.join(geom_dir, "zone.shp")
@@ -883,7 +919,49 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
         with open(extra_desc_path, encoding="utf-8") as _f:
             extra_descriptions = json.load(_f)
 
-    # L0 + L1 nodes from CONSTRUCTION_TYPES.csv
+    # ── Per-building data from scenario (read early; empty dicts when no scenario) ──
+    # assembly_to_buildings: L1 assembly code → set of building names that use it
+    # const_type_to_buildings: L0 const_type → set of building names
+    assembly_to_buildings: dict[str, set[str]] = {}
+    const_type_to_buildings: dict[str, set[str]] = {}
+    active_const_types: list[str] = []
+    has_assembly_data: bool = False
+
+    if scenario_name:
+        scenario_root = os.path.join(SCENARIOS_DIR, f"{scenario_name}-scenario")
+        zone_path = os.path.join(scenario_root, "inputs", "building-geometry", "zone.shp")
+        if os.path.exists(zone_path):
+            try:
+                zone_gdf = gpd.read_file(zone_path)
+                for _, zrow in zone_gdf.iterrows():
+                    bname = str(zrow.get("name") or "").strip()
+                    ct    = str(zrow.get("const_type") or "").strip()
+                    if bname and ct:
+                        const_type_to_buildings.setdefault(ct, set()).add(bname)
+                active_const_types = list(const_type_to_buildings.keys())
+            except Exception as exc:
+                _techtree_logger.warning("TechTree: failed to read zone.shp for %s: %s", scenario_name, exc)
+
+        props_dir = os.path.join(scenario_root, "inputs", "building-properties")
+        for fname, cols in _PROPS_FILES_COLS:
+            fpath = os.path.join(props_dir, fname)
+            if not os.path.exists(fpath):
+                continue
+            has_assembly_data = True
+            try:
+                with open(fpath, newline="", encoding="utf-8") as f:
+                    for brow in csv.DictReader(f):
+                        bname = str(brow.get("name") or "").strip()
+                        if not bname:
+                            continue
+                        for col in cols:
+                            code = str(brow.get(col) or "").strip()
+                            if code:
+                                assembly_to_buildings.setdefault(code, set()).add(bname)
+            except Exception as exc:
+                _techtree_logger.warning("TechTree: failed to read %s for %s: %s", fname, scenario_name, exc)
+
+    # ── L0 + L1 nodes from CONSTRUCTION_TYPES.csv ──
     if os.path.exists(const_types_path):
         with open(const_types_path, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
@@ -901,7 +979,11 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
     else:
         _techtree_logger.warning("TechTree: CONSTRUCTION_TYPES.csv not found at %s", const_types_path)
 
-    # L2 nodes + L1→L2 edges, and L3 nodes from assembly files
+    # ── L2 nodes + L1→L2 edges, L3 nodes from assembly files ──
+    # Also accumulate component/feedstock → buildings while reading the assembly rows.
+    component_to_buildings: dict[str, set[str]] = {}
+    feedstock_to_buildings: dict[str, set[str]] = {}
+
     seen_families: set[str] = set()
     for family_id, (subcat, filename) in ASSEMBLY_FAMILY_TO_FILE.items():
         sublayer = "l2.1" if subcat == "ENVELOPE" else ("l2.2" if subcat == "HVAC" else "l2.3")
@@ -917,7 +999,7 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
         with open(filepath, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             headers = reader.fieldnames or []
-            has_primary = "primary_components" in headers
+            has_primary  = "primary_components" in headers
             has_feedstock = "feedstock" in headers
             for row in reader:
                 code = str(row.get("code") or "").strip()
@@ -927,18 +1009,23 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
                     add_edge(code, family_id)
                     if not nodes[code]["description"]:
                         nodes[code]["description"] = str(row.get("description") or "").strip()
+                bldgs = assembly_to_buildings.get(code, set())
                 if has_primary:
                     comp = str(row.get("primary_components") or "").strip()
                     if comp and comp != "-":
                         add_node(comp, comp, 5, "l3.1")
                         add_edge(family_id, comp)
+                        if bldgs:
+                            component_to_buildings.setdefault(comp, set()).update(bldgs)
                 if has_feedstock:
                     fs = str(row.get("feedstock") or "").strip().upper()
                     if fs and fs != "NONE":
                         add_node(fs, fs.capitalize(), 6, "l3.2")
                         add_edge(family_id, fs)
+                        if bldgs:
+                            feedstock_to_buildings.setdefault(fs, set()).update(bldgs)
 
-    # L3.1→L3.2 edges from CONVERSION files
+    # ── L3.1→L3.2 edges from CONVERSION files ──
     if os.path.exists(conversion_base):
         for fname in os.listdir(conversion_base):
             if not fname.endswith(".csv"):
@@ -963,37 +1050,68 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
                     if fs:
                         add_node(fs, fs.capitalize(), 6, "l3.2")
                         add_edge(code, fs)
+                        bldgs = component_to_buildings.get(code, set())
+                        if bldgs:
+                            feedstock_to_buildings.setdefault(fs, set()).update(bldgs)
 
     # Apply extra descriptions as fallback for nodes still missing a description
     for node_id, node in nodes.items():
         if not node["description"]:
             node["description"] = extra_descriptions.get(node_id, "")
 
-    # Active const_types from scenario zone.shp
-    active_const_types: list[str] = []
-    if scenario_name:
-        zone_path = os.path.join(SCENARIOS_DIR, f"{scenario_name}-scenario", "inputs", "building-geometry", "zone.shp")
-        if os.path.exists(zone_path):
-            try:
-                zone_gdf = gpd.read_file(zone_path)
-                active_const_types = list({str(v) for v in zone_gdf.get("const_type", []) if v and str(v).strip()})
-            except Exception as exc:
-                _techtree_logger.warning("TechTree: failed to read zone.shp for %s: %s", scenario_name, exc)
+    # ── Compute family (L2) → buildings from L1→L2 edges ──
+    family_to_buildings: dict[str, set[str]] = {}
+    for e in edges:
+        src_node = nodes.get(e["source"])
+        tgt_node = nodes.get(e["target"])
+        if src_node and tgt_node and src_node["sublayer"] == "l1" and tgt_node["sublayer"].startswith("l2"):
+            family_to_buildings.setdefault(e["target"], set()).update(
+                assembly_to_buildings.get(e["source"], set())
+            )
+
+    # ── Apply building_count to every node ──
+    all_buildings: set[str] = set()
+    for s in const_type_to_buildings.values():
+        all_buildings.update(s)
+    total_buildings = len(all_buildings)
+
+    for node_id, node in nodes.items():
+        sublayer = node["sublayer"]
+        if sublayer == "l0":
+            bset = const_type_to_buildings.get(node_id, set())
+        elif sublayer == "l1":
+            bset = assembly_to_buildings.get(node_id, set())
+        elif sublayer.startswith("l2"):
+            bset = family_to_buildings.get(node_id, set())
+        elif sublayer == "l3.1":
+            bset = component_to_buildings.get(node_id, set())
+        elif sublayer == "l3.2":
+            bset = feedstock_to_buildings.get(node_id, set())
+        else:
+            bset = set()
+        node["building_count"] = len(bset)
 
     node_list = list(nodes.values())
     _techtree_logger.info(
-        "TechTree: %d L0, %d L1, %d L2, %d L3 nodes, %d edges",
+        "TechTree: %d L0, %d L1, %d L2, %d L3 nodes, %d edges, %d total buildings",
         sum(1 for n in node_list if n["sublayer"] == "l0"),
         sum(1 for n in node_list if n["sublayer"] == "l1"),
         sum(1 for n in node_list if n["sublayer"].startswith("l2")),
         sum(1 for n in node_list if n["sublayer"].startswith("l3")),
         len(edges),
+        total_buildings,
     )
     missing = [n["id"] for n in node_list if n["sublayer"] == "l1" and n["id"] not in {e["source"] for e in edges if e.get("field")}]
     if missing:
         _techtree_logger.warning("TechTree: %d L1 codes have no L1→L2 edge: %s", len(missing), missing[:10])
 
-    return {"active_const_types": active_const_types, "nodes": node_list, "edges": edges}
+    return {
+        "active_const_types": active_const_types,
+        "nodes": node_list,
+        "edges": edges,
+        "total_buildings": total_buildings,
+        "has_assembly_data": has_assembly_data,
+    }
 
 
 @app.get("/api/techtree-graph")
@@ -1077,25 +1195,138 @@ def get_scenario_status(scenario_name: str):
 
 CEA_CMD = os.environ.get("CEA_CMD", "/home/salva/micromamba/envs/cea/bin/cea")
 
-SIMULATION_STEPS = [
-    ("database-helper",     [CEA_CMD, "database-helper",     "--databases-path", "DE"]),
-    ("archetypes-mapper",   [CEA_CMD, "archetypes-mapper"]),
-    ("surroundings-helper", [CEA_CMD, "surroundings-helper"]),
-    ("terrain-helper",      [CEA_CMD, "terrain-helper"]),
-    ("weather-helper",      [CEA_CMD, "weather-helper"]),
-    ("radiation",           [CEA_CMD, "radiation",           "--multiprocessing", "true"]),
-    ("occupancy",           [CEA_CMD, "occupancy",           "--multiprocessing", "true"]),
-    ("demand",              [CEA_CMD, "demand",              "--multiprocessing", "true"]),
+# what-if name used for the baseline (production-mode) final-energy / emissions / costs runs
+_WHATIF_BASELINE = "baseline"
+
+# Each step is (step_name, cmd_prefix, uses_scenario_flag)
+# uses_scenario_flag=True  → appends ["--scenario", scenario_path] (standard CEA CLI)
+_BASE_STEPS = [
+    ("database-helper",     [CEA_CMD, "database-helper",     "--databases-path", "DE"], True),
+    ("archetypes-mapper",   [CEA_CMD, "archetypes-mapper"],                              True),
+    ("surroundings-helper", [CEA_CMD, "surroundings-helper"],                            True),
+    ("terrain-helper",      [CEA_CMD, "terrain-helper"],                                 True),
+    ("weather-helper",      [CEA_CMD, "weather-helper"],                                 True),
+    ("radiation",           [CEA_CMD, "radiation",           "--multiprocessing", "true"], True),
+    ("occupancy",           [CEA_CMD, "occupancy",           "--multiprocessing", "true"], True),
+    ("demand",              [CEA_CMD, "demand",              "--multiprocessing", "true"], True),
 ]
 
+# CEA 4.x what-if pipeline: final-energy must run before emissions and system-costs.
+# Both emissions and system-costs read from the final-energy output folder keyed by _WHATIF_BASELINE.
+_EXTRA_STEPS = {
+    "final-energy":              ([CEA_CMD, "final-energy",
+                                   "--what-if-name", _WHATIF_BASELINE],                   True),
+    "emissions":                 ([CEA_CMD, "emissions",
+                                   "--what-if-name", _WHATIF_BASELINE],                   True),
+    "system-costs":              ([CEA_CMD, "system-costs",
+                                   "--what-if-name", _WHATIF_BASELINE],                   True),
+    "photovoltaic":              ([CEA_CMD, "photovoltaic",     "--multiprocessing", "true"], True),
+    "photovoltaic-thermal":      ([CEA_CMD, "photovoltaic-thermal", "--multiprocessing", "true"], True),
+    "solar-collector":           ([CEA_CMD, "solar-collector",  "--multiprocessing", "true"], True),
+    "shallow-geothermal-potential": ([CEA_CMD, "shallow-geothermal-potential"],            True),
+    "sewage-potential":          ([CEA_CMD, "sewage-potential"],                           True),
+    "network-layout":            ([CEA_CMD, "network-layout"],                             True),
+    "thermal-network":           ([CEA_CMD, "thermal-network"],                            True),
+}
 
-_logger = logging.getLogger("cea_pipeline")
+_PROFILE_EXTRA: dict[str, list[str]] = {
+    "demand":     [],
+    "lifecycle":  ["solar-collector", "final-energy", "emissions", "system-costs"],
+    "renewables": ["photovoltaic", "photovoltaic-thermal", "solar-collector",
+                   "shallow-geothermal-potential", "sewage-potential"],
+    "network":    ["network-layout", "thermal-network"],
+    "full":       ["final-energy", "emissions", "system-costs",
+                   "photovoltaic", "photovoltaic-thermal", "solar-collector",
+                   "shallow-geothermal-potential", "sewage-potential",
+                   "network-layout", "thermal-network"],
+}
+
+_SOFT_FAIL_STEPS: frozenset[str] = frozenset({
+    "emissions", "system-costs",
+    "photovoltaic", "photovoltaic-thermal", "solar-collector",
+    "shallow-geothermal-potential", "sewage-potential",
+    "network-layout", "thermal-network",
+})
+_STEP_TIMEOUT_SECS = 30 * 60  # kill any step that runs longer than 30 minutes
 
 
-async def _cea_pipeline(scenario_path: str):
-    base_args = ["--scenario", scenario_path]
-    for step_name, cmd in SIMULATION_STEPS:
-        full_cmd = cmd + base_args
+def _step_done(step_name: str, scenario_path: str) -> bool:
+    """Return True if this step's primary output already exists — skip the step if so."""
+    def p(*parts): return os.path.join(scenario_path, *parts)
+
+    def has_files(folder):
+        return os.path.isdir(folder) and bool(os.listdir(folder))
+
+    checks: dict[str, bool] = {
+        "database-helper":              os.path.isdir(p("inputs", "technology")),
+        "archetypes-mapper":            os.path.exists(p("inputs", "building-properties", "envelope.csv"))
+                                     or os.path.exists(p("inputs", "building-properties", "architecture.dbf")),
+        "surroundings-helper":          os.path.exists(p("inputs", "building-geometry", "surroundings.shp")),
+        "terrain-helper":               os.path.exists(p("inputs", "topography", "terrain.tif")),
+        "weather-helper":               os.path.exists(p("inputs", "weather", "weather.epw")),
+        "radiation":                    has_files(p("outputs", "data", "solar-radiation")),
+        "occupancy":                    has_files(p("outputs", "data", "occupancy")),
+        "demand":                       os.path.exists(p("outputs", "data", "demand", "Total_demand.csv")),
+        "final-energy":                 os.path.exists(p("outputs", "data", "final-energy", _WHATIF_BASELINE,
+                                                          "final_energy_buildings.csv")),
+        "emissions":                    os.path.exists(p("outputs", "data", "analysis", _WHATIF_BASELINE,
+                                                          "emissions", "emissions_buildings.csv")),
+        "system-costs":                 os.path.exists(p("outputs", "data", "analysis", _WHATIF_BASELINE,
+                                                          "costs", "costs_buildings.csv")),
+        "photovoltaic":                 any(f.startswith("PV_") and f.endswith("_total_buildings.csv")
+                                           for f in (os.listdir(p("outputs", "data", "potentials", "solar"))
+                                                     if os.path.isdir(p("outputs", "data", "potentials", "solar")) else [])),
+        "photovoltaic-thermal":         any(f.startswith("PVT_") and f.endswith("_total_buildings.csv")
+                                           for f in (os.listdir(p("outputs", "data", "potentials", "solar"))
+                                                     if os.path.isdir(p("outputs", "data", "potentials", "solar")) else [])),
+        "solar-collector":              any(f.startswith("SC_") and f.endswith("_total_buildings.csv")
+                                           for f in (os.listdir(p("outputs", "data", "potentials", "solar"))
+                                                     if os.path.isdir(p("outputs", "data", "potentials", "solar")) else [])),
+        "shallow-geothermal-potential": os.path.exists(p("outputs", "data", "potentials", "Shallow_geothermal_potential.csv")),
+        "sewage-potential":             os.path.exists(p("outputs", "data", "potentials", "Sewage_heat_potential.csv")),
+        "network-layout":               has_files(p("outputs", "data", "thermal-network")),
+        "thermal-network":              has_files(p("outputs", "data", "thermal-networks")),
+    }
+    return checks.get(step_name, False)
+
+
+def _repair_zone_multipolygons(scenario_path: str) -> None:
+    """Convert any MultiPolygon rows in zone.shp to their largest constituent Polygon.
+
+    CEA's databases_verification raises if zone.shp contains non-Polygon geometries.
+    This repair is idempotent — no-op when all geometries are already Polygons.
+    """
+    zone_path = os.path.join(scenario_path, "inputs", "building-geometry", "zone.shp")
+    if not os.path.exists(zone_path):
+        return
+    gdf = gpd.read_file(zone_path)
+    bad = gdf.geometry.geom_type == "MultiPolygon"
+    if not bad.any():
+        return
+    gdf.loc[bad, "geometry"] = gdf.loc[bad, "geometry"].apply(
+        lambda g: max(g.geoms, key=lambda p: p.area)
+    )
+    gdf.to_file(zone_path, encoding="UTF-8")
+    _logger.info("Repaired %d MultiPolygon(s) in zone.shp", bad.sum())
+
+
+async def _cea_pipeline(scenario_path: str, profile: str = "demand"):
+    _repair_zone_multipolygons(scenario_path)
+    extra_keys = _PROFILE_EXTRA.get(profile, [])
+    steps = _BASE_STEPS + [(k,) + _EXTRA_STEPS[k] for k in extra_keys]
+    yield f"data: {json.dumps({'total': len(steps)})}\n\n"
+    for step_name, cmd, uses_scenario_flag in steps:
+        # Skip if output already exists
+        if _step_done(step_name, scenario_path):
+            _logger.info("CEA step [%s]: output exists, skipping.", step_name)
+            yield f"data: {json.dumps({'step': step_name, 'status': 'done', 'message': 'skipped (already complete)'})}\n\n"
+            continue
+
+        if uses_scenario_flag:
+            full_cmd = cmd + ["--scenario", scenario_path]
+        else:
+            # Non-CLI steps: scenario_path is passed as positional argument
+            full_cmd = list(cmd) + [scenario_path]
         _logger.info("CEA step [%s]: %s", step_name, " ".join(full_cmd))
         yield f"data: {json.dumps({'step': step_name, 'status': 'running'})}\n\n"
 
@@ -1113,15 +1344,32 @@ async def _cea_pipeline(scenario_path: str):
             return
 
         tail: list[str] = []
-        async for raw_line in proc.stdout:
-            line = raw_line.decode(errors="replace").strip()
-            if not line:
-                continue
-            _logger.debug("  [%s] %s", step_name, line)
-            tail = (tail + [line])[-20:]  # keep last 20 lines for error context
-            yield f"data: {json.dumps({'step': step_name, 'status': 'running', 'message': line})}\n\n"
+        timed_out = False
+        try:
+            async with asyncio.timeout(_STEP_TIMEOUT_SECS):
+                async for raw_line in proc.stdout:
+                    line = raw_line.decode(errors="replace").strip()
+                    if not line:
+                        continue
+                    _logger.debug("  [%s] %s", step_name, line)
+                    tail = (tail + [line])[-20:]
+                    yield f"data: {json.dumps({'step': step_name, 'status': 'running', 'message': line})}\n\n"
+                await proc.wait()
+        except asyncio.TimeoutError:
+            timed_out = True
+            proc.kill()
+            await proc.wait()
 
-        await proc.wait()
+        if timed_out:
+            mins = _STEP_TIMEOUT_SECS // 60
+            msg = f"Step timed out after {mins} minutes and was killed"
+            _logger.error("CEA step [%s] timed out after %d min.", step_name, mins)
+            yield f"data: {json.dumps({'step': step_name, 'status': 'error', 'message': msg})}\n\n"
+            if step_name in _SOFT_FAIL_STEPS:
+                _logger.warning("CEA step [%s] is non-critical, continuing pipeline.", step_name)
+                continue
+            yield f"data: {json.dumps({'status': 'failed'})}\n\n"
+            return
 
         if proc.returncode != 0:
             context = " | ".join(tail[-5:]) if tail else "(no output)"
@@ -1129,7 +1377,11 @@ async def _cea_pipeline(scenario_path: str):
                 "CEA step [%s] exited %d. Last output: %s",
                 step_name, proc.returncode, context,
             )
-            yield f"data: {json.dumps({'step': step_name, 'status': 'error', 'message': f'Exit code {proc.returncode}: {context}'})}\n\n"
+            err_msg = f"Exit code {proc.returncode}: {context}"
+            yield f"data: {json.dumps({'step': step_name, 'status': 'error', 'message': err_msg})}\n\n"
+            if step_name in _SOFT_FAIL_STEPS:
+                _logger.warning("CEA step [%s] is non-critical, continuing pipeline.", step_name)
+                continue
             yield f"data: {json.dumps({'status': 'failed'})}\n\n"
             return
 
@@ -1140,14 +1392,16 @@ async def _cea_pipeline(scenario_path: str):
 
 
 @app.get("/api/run-simulation")
-async def run_simulation(scenario_name: str):
+async def run_simulation(scenario_name: str, profile: str = "demand"):
     """Stream CEA simulation pipeline progress via SSE."""
     folder = f"{scenario_name}-scenario"
     scenario_path = os.path.join(SCENARIOS_DIR, folder)
     if not os.path.isdir(scenario_path):
         raise HTTPException(status_code=404, detail=f"Scenario not found: {scenario_path}")
+    if profile not in _PROFILE_EXTRA:
+        raise HTTPException(status_code=400, detail=f"Unknown profile: {profile}")
     return StreamingResponse(
-        _cea_pipeline(scenario_path),
+        _cea_pipeline(scenario_path, profile),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -1260,5 +1514,224 @@ def get_scenario_data(scenario_name: str):
         raise HTTPException(status_code=404, detail="scenario.json not found")
     with open(snapshot_path, "r", encoding="utf-8") as _f:
         return json.load(_f)
+
+
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _safe_tolist(series):
+    return [round(float(v), 3) if pd.notna(v) else 0.0 for v in series]
+
+
+@app.get("/api/kpi-data/{scenario_name}")
+def get_kpi_data(scenario_name: str):
+    """Return aggregated KPI data from CEA output CSVs for the KPI dashboard."""
+    _, scenario_path = normalize_scenario_name(scenario_name)
+    if not os.path.isdir(scenario_path):
+        raise HTTPException(status_code=404, detail=f"Scenario not found: {scenario_name}")
+
+    def p(*parts):
+        return os.path.join(scenario_path, "outputs", "data", *parts)
+
+    result: dict = {
+        "available": [],
+        "meta": {},
+        "annual": None,
+        "monthly": None,
+        "monthly_balance": None,
+        "load_duration": None,
+        "hourly_sample": None,
+        "solar_radiation": None,
+        "emissions": None,
+        "costs": None,
+        "potentials": None,
+        "network": None,
+    }
+
+    # ── Demand (Profile A) ──────────────────────────────────────────────────────
+    demand_csv = p("demand", "Total_demand.csv")
+    hourly_csv = p("demand", "Total_demand_hourly.csv")
+
+    if os.path.exists(demand_csv) and os.path.exists(hourly_csv):
+        result["available"].append("demand")
+
+        # Annual totals
+        adf = pd.read_csv(demand_csv)
+        want_annual = ["name", "GFA_m2", "Aroof_m2",
+                       "Qhs_sys_MWhyr", "Qww_sys_MWhyr", "Qcs_sys_MWhyr", "E_sys_MWhyr",
+                       "QH_sys_MWhyr", "QC_sys_MWhyr",
+                       "E_sys0_kW", "Qhs_sys0_kW", "Qcs_sys0_kW"]
+        annual_cols = [c for c in want_annual if c in adf.columns]
+        annual = adf[annual_cols]
+        result["annual"] = annual.fillna(0).to_dict(orient="records")
+        result["meta"] = {
+            "building_count": len(adf),
+            "total_gfa_m2": float(adf["GFA_m2"].sum()) if "GFA_m2" in adf.columns else 0,
+        }
+
+        # Hourly data
+        hdf = pd.read_csv(hourly_csv, index_col=0, parse_dates=True)
+
+        # Monthly demand
+        monthly = hdf.resample("ME").sum()
+        n = min(len(monthly), 12)
+        result["monthly"] = {
+            "labels": _MONTHS[:n],
+            "heating_MWh": _safe_tolist(monthly["QH_sys_kWh"].iloc[:n] / 1000) if "QH_sys_kWh" in monthly else [],
+            "cooling_MWh": _safe_tolist(monthly["QC_sys_kWh"].iloc[:n] / 1000) if "QC_sys_kWh" in monthly else [],
+            "electricity_MWh": _safe_tolist(monthly["E_sys_kWh"].iloc[:n] / 1000) if "E_sys_kWh" in monthly else [],
+        }
+
+        # Monthly thermal balance
+        bal_monthly = hdf.resample("ME").sum()
+        balance = {"labels": _MONTHS[:n]}
+        for col in ["I_sol_kWh", "Q_gain_sen_peop_kWh", "Q_gain_sen_light_kWh",
+                    "Q_gain_sen_app_kWh", "Q_gain_sen_wall_kWh",
+                    "Q_loss_sen_ref_kWh", "I_rad_kWh"]:
+            if col in bal_monthly.columns:
+                balance[col] = _safe_tolist(bal_monthly[col].iloc[:n])
+        result["monthly_balance"] = balance
+
+        # Load duration curves — sort descending, every 9th → ~1000 pts
+        ldc = {}
+        for out_key, col in [("heating_kWh", "Qhs_sys_kWh"),
+                               ("cooling_kWh", "Qcs_sys_kWh"),
+                               ("electricity_kWh", "E_sys_kWh")]:
+            if col in hdf.columns:
+                vals = hdf[col].sort_values(ascending=False).values[::9]
+                ldc[out_key] = [round(float(v), 2) for v in vals]
+            else:
+                ldc[out_key] = []
+        result["load_duration"] = ldc
+
+        # Hourly sample — every 6th row → ~1460 pts
+        sample = hdf.iloc[::6]
+        dates = []
+        for idx in sample.index:
+            try:
+                dates.append(idx.strftime("%b %d"))
+            except Exception:
+                dates.append(str(idx))
+        hs: dict = {"dates": dates}
+        for col in ["Qhs_sys_kWh", "Qww_sys_kWh", "Qcs_sys_kWh", "E_sys_kWh"]:
+            if col in sample.columns:
+                hs[col] = _safe_tolist(sample[col])
+        # theta_o_C in Total_demand_hourly.csv is operative temperature summed across all
+        # buildings — divide by building count to get district-average operative temp.
+        n_bldg = result["meta"]["building_count"] or 1
+        if "theta_o_C" in sample.columns:
+            hs["theta_op_avg_C"] = _safe_tolist(sample["theta_o_C"] / n_bldg)
+        result["hourly_sample"] = hs
+
+        # Solar radiation — aggregate per-building CSVs from solar-radiation/
+        rad_dir = p("..", "..", "solar-radiation")
+        # CEA actually puts them at outputs/data/solar-radiation one level up
+        rad_dir2 = os.path.join(scenario_path, "outputs", "data", "solar-radiation")
+        for rdir in (rad_dir, rad_dir2):
+            if not os.path.isdir(rdir):
+                continue
+            rad_files = [f for f in os.listdir(rdir) if f.endswith("_radiation.csv")]
+            if not rad_files:
+                continue
+            rad_dfs = []
+            for rf in rad_files:
+                try:
+                    rdf = pd.read_csv(os.path.join(rdir, rf), index_col=0, parse_dates=True)
+                    rad_dfs.append(rdf)
+                except Exception:
+                    pass
+            if not rad_dfs:
+                break
+            rad_agg = rad_dfs[0].copy()
+            for rdf in rad_dfs[1:]:
+                rad_agg = rad_agg.add(rdf, fill_value=0)
+            # Radiation CSVs use TMY dates spanning multiple years; reset to a synthetic
+            # 2022 sequence so resample("ME") produces clean 12-month groups.
+            rad_agg = rad_agg.iloc[:8760]
+            rad_agg.index = pd.date_range("2022-01-01", periods=len(rad_agg), freq="h")
+            kw_cols = [c for c in rad_agg.columns if c.endswith("_kW")]
+            rad_monthly = rad_agg[kw_cols].resample("ME").sum() / 1000  # kWh→MWh
+            nr = min(len(rad_monthly), 12)
+            sol = {"labels": _MONTHS[:nr]}
+            orientation_groups = {
+                "roofs_top": "roofs_top_kW",
+                "walls_south": "walls_south_kW",
+                "walls_east": "walls_east_kW",
+                "walls_west": "walls_west_kW",
+                "walls_north": "walls_north_kW",
+                "windows_south": "windows_south_kW",
+                "windows_east": "windows_east_kW",
+                "windows_west": "windows_west_kW",
+                "windows_north": "windows_north_kW",
+            }
+            for key, col in orientation_groups.items():
+                if col in rad_monthly.columns:
+                    sol[key] = _safe_tolist(rad_monthly[col].iloc[:nr])
+            result["solar_radiation"] = sol
+            break
+
+    # ── Emissions & Costs (Profile B) — CEA 4.x what-if output paths ──────────────
+    # what-if-name="baseline" is the production-mode name used by the pipeline.
+    emissions_csv = p("analysis", _WHATIF_BASELINE, "emissions", "emissions_buildings.csv")
+    costs_csv     = p("analysis", _WHATIF_BASELINE, "costs",     "costs_buildings.csv")
+
+    if os.path.exists(emissions_csv):
+        result["available"].append("lifecycle")
+        edf = pd.read_csv(emissions_csv)
+        result["emissions"] = edf.fillna(0).to_dict(orient="records")
+
+    if os.path.exists(costs_csv):
+        if "lifecycle" not in result["available"]:
+            result["available"].append("lifecycle")
+        cdf = pd.read_csv(costs_csv)
+        result["costs"] = cdf.fillna(0).to_dict(orient="records")
+
+    # ── Potentials (Profile C) ──────────────────────────────────────────────────
+    # CEA 4.x names PV files as PV_PV1_total_buildings.csv, PV_PV2_…, etc.
+    import glob as _glob
+    _sol_dir = p("potentials", "solar")
+    pv_files  = sorted(_glob.glob(os.path.join(_sol_dir, "PV_PV*_total_buildings.csv")))
+    pvt_files = sorted(_glob.glob(os.path.join(_sol_dir, "PVT_PV*_*_total_buildings.csv")))
+    sc_files  = sorted(_glob.glob(os.path.join(_sol_dir, "SC_*_total_buildings.csv")))
+    pv_csv   = pv_files[0]  if pv_files  else p("potentials", "solar", "PV_total_buildings.csv")
+    pvt_csv  = pvt_files[0] if pvt_files else p("potentials", "solar", "PVT_total_buildings.csv")
+    sc_csv   = sc_files[0]  if sc_files  else p("potentials", "solar", "SC_total_buildings.csv")
+    geo_csv  = p("potentials", "geothermal_potential.csv")
+    sew_csv  = p("potentials", "sewage_heat_potential.csv")
+
+    if any(os.path.exists(f) for f in [pv_csv, pvt_csv, sc_csv, geo_csv, sew_csv]):
+        result["available"].append("renewables")
+        potentials: dict = {}
+        for path, key in [(pv_csv, "pv"), (pvt_csv, "pvt"), (sc_csv, "sc"),
+                          (geo_csv, "geothermal"), (sew_csv, "sewage")]:
+            if os.path.exists(path):
+                pdf = pd.read_csv(path)
+                potentials[key] = pdf.fillna(0).to_dict(orient="records")
+        result["potentials"] = potentials
+
+    # ── Thermal Network (Profile D) ─────────────────────────────────────────────
+    net_dir = p("thermal-networks")
+    if os.path.isdir(net_dir):
+        network_folders = [d for d in os.listdir(net_dir)
+                           if os.path.isdir(os.path.join(net_dir, d))]
+        for nf in network_folders:
+            plant_file = os.path.join(net_dir, nf, f"DH_{nf}_plant_thermal_load_kW.csv")
+            if not os.path.exists(plant_file):
+                continue
+            result["available"].append("network")
+            ndf = pd.read_csv(plant_file, index_col=0, parse_dates=True)
+            net_monthly = ndf.resample("ME").sum()
+            nn = min(len(net_monthly), 12)
+            network: dict = {
+                "labels": _MONTHS[:nn],
+                "name": nf,
+            }
+            for col in ndf.columns:
+                network[col] = _safe_tolist(ndf[col].sort_values(ascending=False).values[::9])
+            result["network"] = network
+            break
+
+    return result
 
 

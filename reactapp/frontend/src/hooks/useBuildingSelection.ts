@@ -307,12 +307,17 @@ export function useBuildingSelection({
 
   useEffect(() => {
     const target = confirmedSelection ?? selection;
+    // Use lockedSelectionGeoJSONWithState when confirmed so the saved snapshot
+    // includes building assignment data (const_type, refurbishment_type, etc.).
+    const geoJSON = confirmedSelection
+      ? (lockedSelectionGeoJSONWithState ?? confirmedSelection.selectedGeoJSON)
+      : selection.selectedGeoJSON;
     onActiveSelectionChange(
-      target.count > 0 && target.selectedGeoJSON
-        ? { selectedGeoJSON: target.selectedGeoJSON, count: target.count }
+      target.count > 0 && geoJSON
+        ? { selectedGeoJSON: geoJSON, count: target.count }
         : null,
     );
-  }, [confirmedSelection, selection, onActiveSelectionChange]);
+  }, [confirmedSelection, selection, lockedSelectionGeoJSONWithState, onActiveSelectionChange]);
 
   useEffect(() => {
     onDrawnPolygonChange(drawnPolygon);

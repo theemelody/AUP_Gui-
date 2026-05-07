@@ -24,6 +24,7 @@ interface RawNode {
   layer: number;
   sublayer: string;
   description?: string;
+  building_count?: number;
 }
 
 interface RawEdge {
@@ -37,6 +38,8 @@ interface GraphData {
   active_const_types: string[];
   nodes: RawNode[];
   edges: RawEdge[];
+  total_buildings?: number;
+  has_assembly_data?: boolean;
 }
 
 interface TechTreeProps {
@@ -179,6 +182,7 @@ function buildVisibleGraph(
   filterExpanded: Set<string> | null,
   buildingCounts: Record<string, number> = {},
   totalBuildings = 0,
+  hasAssemblyData = false,
 ): { nodes: Node[]; edges: Edge[] } {
   // When filter is active, show the filter-expanded set; otherwise show activeIds only
   const visibleSet = filterExpanded ?? activeIds;
@@ -189,6 +193,8 @@ function buildVisibleGraph(
 
   for (const n of data.nodes) {
     if (!visibleSet.has(n.id)) continue;
+    const buildingCount = n.building_count ?? buildingCounts[n.id] ?? 0;
+    if (hasAssemblyData && buildingCount === 0) continue;
     if (collapsed.has(n.sublayer)) {
       const pillId = `__pill_${n.sublayer}`;
       idMap.set(n.id, pillId);
@@ -207,7 +213,7 @@ function buildVisibleGraph(
           sublayer: n.sublayer,
           layer: n.layer,
           expanded,
-          buildingCount: buildingCounts[n.id] ?? 0,
+          buildingCount,
           totalBuildings,
         },
       });
@@ -305,7 +311,7 @@ function TechNode({ data }: { data: Record<string, unknown> }) {
       <span className="tech-node__label">{data.label as string}</span>
       {expanded && (
         <>
-          {total > 0 && (
+          {buildingCount > 0 && (
             <span className="tech-node__count">
               {buildingCount} / {total} buildings
             </span>
@@ -527,6 +533,7 @@ function TechTree({
   const filterSections = useMemo((): FilterSectionData[] => {
     if (!graphData) return [];
     const nodeById = new Map(graphData.nodes.map((n) => [n.id, n]));
+    const hasBuildings = (n: RawNode) => !graphData.has_assembly_data || (n.building_count ?? 0) > 0;
 
     // Map L1 node → its connected L2 family
     const l1ToFamily = new Map<string, string>();
@@ -538,20 +545,20 @@ function TechTree({
       }
     }
 
-    const l0Nodes  = graphData.nodes.filter((n) => n.sublayer === 'l0'          && activeIds.has(n.id));
-    const l2Nodes  = graphData.nodes.filter((n) => n.sublayer.startsWith('l2')  && activeIds.has(n.id));
-    const l31Nodes = graphData.nodes.filter((n) => n.sublayer === 'l3.1'        && activeIds.has(n.id));
-    const l32Nodes = graphData.nodes.filter((n) => n.sublayer === 'l3.2'        && activeIds.has(n.id));
+    const l0Nodes  = graphData.nodes.filter((n) => n.sublayer === 'l0'          && activeIds.has(n.id) && hasBuildings(n));
+    const l2Nodes  = graphData.nodes.filter((n) => n.sublayer.startsWith('l2')  && activeIds.has(n.id) && hasBuildings(n));
+    const l31Nodes = graphData.nodes.filter((n) => n.sublayer === 'l3.1'        && activeIds.has(n.id) && hasBuildings(n));
+    const l32Nodes = graphData.nodes.filter((n) => n.sublayer === 'l3.2'        && activeIds.has(n.id) && hasBuildings(n));
 
     const sections: FilterSectionData[] = [
       { id: 'l0', label: 'L0 · Typology', nodes: l0Nodes },
       { id: 'l2', label: 'L2 · Assembly families', nodes: l2Nodes },
     ];
 
-    // L1 grouped by L2 family — only active L1 nodes
+    // L1 grouped by L2 family — only active L1 nodes with buildings
     for (const familyNode of l2Nodes) {
       const l1InFamily = graphData.nodes.filter(
-        (n) => n.sublayer === 'l1' && activeIds.has(n.id) && l1ToFamily.get(n.id) === familyNode.id,
+        (n) => n.sublayer === 'l1' && activeIds.has(n.id) && hasBuildings(n) && l1ToFamily.get(n.id) === familyNode.id,
       );
       if (l1InFamily.length > 0) {
         sections.push({ id: `l1_${familyNode.id}`, label: `L1 · ${familyNode.label}`, nodes: l1InFamily });
@@ -568,9 +575,10 @@ function TechTree({
   // ELK layout — re-runs when structure, expansion, or filter changes
   useEffect(() => {
     if (!graphData) return;
+    const effectiveTotalBuildings = graphData.total_buildings || totalBuildings;
     const { nodes: vNodes, edges: vEdges } = buildVisibleGraph(
       graphData, collapsed, activeIds, expandedNode, filterExpanded,
-      buildingCountByConstType, totalBuildings,
+      buildingCountByConstType, effectiveTotalBuildings, graphData.has_assembly_data,
     );
     setLayoutReady(false);
     runElkLayout(vNodes, vEdges)

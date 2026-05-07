@@ -198,6 +198,38 @@
   background: rgba(15, 23, 42, 0.8);
 }
 
+/* Simulation progress bar */
+
+.sim-progress {
+  margin-top: var(--spacing-sm);
+  margin-bottom: 2px;
+}
+
+.sim-progress-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sim-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-status-running);
+  transition: width 0.4s ease;
+}
+
+.sim-progress-fill.is-done   { background: var(--color-status-success); }
+.sim-progress-fill.is-failed { background: var(--color-status-error); }
+
+.sim-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--color-dark-text-muted);
+  margin-top: 3px;
+}
+
 /* Simulation log */
 
 .simulation-log {
@@ -224,7 +256,15 @@
 .sim-log-error   .sim-log-icon { color: var(--color-status-error); }
 .sim-log-idle    .sim-log-icon { color: var(--color-dark-text-muted); }
 
-.sim-log-label { color: #cbd5e1; }
+.sim-log-label { color: #cbd5e1; flex: 1; }
+
+.sim-log-time {
+  color: var(--color-dark-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 .sim-log-detail {
   margin: 2px 0 4px 20px;
@@ -248,4 +288,21 @@
   font-size: var(--font-size-sm);
 }
 
+/* Save status log */
+
+.save-status-log {
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--spacing-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.save-status-saving {
+  color: var(--color-status-running);
+  animation: pulse-opacity 1.2s ease-in-out infinite;
+}
+
+.save-status-saved { color: var(--color-status-success); }
+.save-status-failed { color: var(--color-status-error); }
+
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-opacity { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }

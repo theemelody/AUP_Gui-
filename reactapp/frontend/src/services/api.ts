@@ -206,3 +206,41 @@ export async function sendChatMessage(message: string, model?: string): Promise<
   }, 'Chat request');
   return data.reply;
 }
+
+export interface KpiAnnualRow {
+  name: string;
+  GFA_m2: number;
+  Aroof_m2?: number;
+  Qhs_sys_MWhyr: number;
+  Qww_sys_MWhyr: number;
+  Qcs_sys_MWhyr: number;
+  E_sys_MWhyr: number;
+  QH_sys_MWhyr?: number;
+  QC_sys_MWhyr?: number;
+  E_sys0_kW?: number;
+  Qhs_sys0_kW?: number;
+  Qcs_sys0_kW?: number;
+}
+
+export interface KpiData {
+  available: string[];
+  meta: { building_count: number; total_gfa_m2: number };
+  annual: KpiAnnualRow[] | null;
+  monthly: { labels: string[]; heating_MWh: number[]; cooling_MWh: number[]; electricity_MWh: number[] } | null;
+  monthly_balance: Record<string, number[] | string[]> | null;
+  load_duration: { heating_kWh: number[]; cooling_kWh: number[]; electricity_kWh: number[] } | null;
+  hourly_sample: Record<string, number[] | string[]> | null;
+  solar_radiation: Record<string, number[] | string[]> | null;
+  emissions: Record<string, unknown>[] | null;
+  costs: Record<string, unknown>[] | null;
+  potentials: Record<string, Record<string, unknown>[]> | null;
+  network: Record<string, unknown> | null;
+}
+
+export async function fetchKpiData(scenarioName: string): Promise<KpiData> {
+  return fetchJson<KpiData>(
+    `${API_BASE}/kpi-data/${encodeURIComponent(scenarioName)}`,
+    undefined,
+    'KPI data request',
+  );
+}

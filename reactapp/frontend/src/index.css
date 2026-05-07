@@ -27,3 +27,6 @@
 
 /* Common reusable components */
 @import "./styles/common.css";
+
+/* KPI workspace */
+@import "./styles/kpi.css";
