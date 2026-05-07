@@ -7,10 +7,10 @@
   bottom: 12px;
   width: var(--panel-w);
   height: auto;
-  background: rgba(229, 231, 235, 0.55);
+  background: var(--panel-bg);
   -webkit-backdrop-filter: var(--blur-md);
   backdrop-filter: var(--blur-md);
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--color-light-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
@@ -31,10 +31,10 @@
   width: var(--panel-w);
   max-height: calc(100vh - 24px);
   overflow-y: auto;
-  background: rgba(229, 231, 235, 0.55);
+  background: var(--panel-bg);
   -webkit-backdrop-filter: var(--blur-md);
   backdrop-filter: var(--blur-md);
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--color-light-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   padding: var(--spacing-md);
@@ -71,18 +71,18 @@
   height: 32px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(15, 23, 42, 0.15);
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--card-light-bg);
   -webkit-backdrop-filter: var(--blur-sm);
   backdrop-filter: var(--blur-sm);
   color: var(--color-light-text);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  transition: background 180ms ease, transform 60ms ease;
+  transition: background var(--transition-fast), transform var(--transition-quick);
 }
 
 .bottom-panel-toggle:hover {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--btn-light-bg-hover);
 }
 
 .bottom-panel-toggle:active {

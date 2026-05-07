@@ -20,13 +20,7 @@ The app uses a multi-page architecture where each workspace is a separate page c
 #### Entry & App Shell
 
 - `main.jsx` — App bootstrap and global stylesheet imports.
-- `App.jsx` — Re-export shell; delegates to `App.tsx` so `main.jsx` needs no changes.
-- `App.tsx` — Top-level orchestration layer.
-  - Owns: navigation state (via `useNavigation`), sidebar visibility, scenario management, `hasSelection` flag, and simulation state.
-  - Reads `ActiveSelectionInfo` from `buildingSelection` via a callback ref to avoid unnecessary re-renders.
-  - Manages SSE connection (`esRef`) for simulation progress; upserts `LogEntry` objects per step.
-  - Fetches the existing scenarios list and their statuses from the backend on mount.
-  - Lazy-loads all four page components; keeps them all mounted and toggles `display: none` to preserve state across tab switches.
+- `App.tsx` — Top-level layout: wraps `AppContent` in `ScenarioProvider`, passes `getActiveSelection` / `getDrawnPolygon` getter callbacks so the context can read map state at save-time without triggering re-renders. Lazy-loads all four page components; keeps them all mounted and toggles `display: none` to preserve state across tab switches.
 
 #### Navigation
 
@@ -35,11 +29,24 @@ The app uses a multi-page architecture where each workspace is a separate page c
   - `navigationReducer` handles `NAVIGATE` actions with no-op on same-page transitions.
 - `hooks/useNavigation.ts` — `useReducer` wrapper exposing `{ activePage, navigate }`.
 
+#### Context (`context/`)
+
+- `ScenarioContext.tsx` — Holds all scenario state: name, saved list, statuses, simulation log/status, loaded scenario. Provides `saveScenario()`, `selectScenarioForSim()`, and `runSimulation()` actions. `LeftDock` reads directly from this context — no prop drilling.
+
+#### Hooks (`hooks/`)
+
+- `useNavigation.ts` — Navigation state machine wrapper.
+- `useBuildingSelection.ts` — Encapsulates the 3-phase building selection state machine (draw → confirm → assign construction type) including all derived state and the scenario-restore effect.
+- `useMapboxMapping.ts` — Lazy-loads and caches the Mapbox → CEA use-type mapping; warms the cache on mount to avoid a race on first selection.
+- `useMapbox3D.ts` — Initialises terrain DEM, sky atmosphere, and 3D basemap buildings layer on first map load.
+- `useMapboxDraw.ts` — Full `MapboxDraw` lifecycle: initialisation, `fireSelection` debounced callback, phase-aware routing between initial selection and construction-area sub-selection, draw button visibility, stale shape cleanup.
+- `useMapboxFit.ts` — Exposes `fitToBounds` utility; owns the `fitToGeoJSON` fly-to effect for scenario restore.
+
 #### Pages (`pages/`)
 
 All pages are lazy-loaded and persistently mounted.
 
-- `buildingSelection.tsx` — Building Workspace. Contains all map-based selection logic, construction-phase feature definition, and selection confirmation workflow. Reports active selection state up to `App.tsx` via `onActiveSelectionChange` callback. When a saved scenario is loaded, restores `confirmedSelection`, `buildingAssignments`, and `drawnPolygon` from `scenario.json` and propagates `activeConstTypes` to the Tech Tree.
+- `buildingSelection.tsx` — Building Workspace. Thin layout wrapper: loads buildings GeoJSON and construction mapping, delegates all state logic to `useBuildingSelection`, renders MapView + panels. Reports active selection state up to `App.tsx` via `onActiveSelectionChange` callback.
 - `techTree.tsx` — Tech Tree Workspace. Renders the CEA construction-type dependency graph using **ReactFlow** and the **ELK** hierarchical layout engine.
   - Fetches graph data from `/api/techtree-graph`; computes the set of active nodes by propagating `activeConstTypes` through graph edges.
   - Only active nodes are passed to ELK (typically 5–25 in a collapsed view, 50–100 expanded), avoiding layout-engine overload.
@@ -51,25 +58,45 @@ All pages are lazy-loaded and persistently mounted.
 
 #### Components (`components/`)
 
-- `LeftDock.jsx` — Left sidebar tab bar. Accepts `activePage` and `onNavigate` props driven by the navigation state machine. Houses scenario controls: name input, save button, scenario chips with status dots (green = simulation complete, amber = inputs ready, grey = missing), run-simulation button, and a live simulation log panel. Clicking a scenario chip now loads its full state (map buildings, construction assignments, drawn polygon) from `scenario.json` and navigates to the Building Workspace.
-- `ChatPanel.jsx` — Self-contained floating chat panel. Owns all chat state (`chatMessages`, `chatInput`, `chatLoading`, `chatError`) and model state (`availableModels`, `selectedModel`). Fetches Ollama models on mount and renders a dropdown when multiple are available. No chat state in parent components.
-- `SelectionPanel.jsx` — Bottom-centre panel with selected buildings, confirm/reset actions, and building cards.
-- `RightPanel.jsx` — Right floating panel for construction-type feature definition, showing use-type and mapbox-type filtered refurbishment/detail/year-range options.
-- `MapView.jsx` — Map rendering and draw interaction. Frontend-side building selection using Mapbox `building` features, building-part parent resolution, CEA use-type mapping, and confirmed-selection colour states. Accepts a `fitToGeoJSON` prop that triggers an animated `fitBounds` camera move whenever the confirmed selection changes (scenario load or user-confirmed draw).
+- `LeftDock.tsx` — Left sidebar tab bar. Reads all scenario state from `ScenarioContext` (4 props only: `sidebarHidden`, `activePage`, `onNavigate`, `hasSelection`). Houses scenario controls: name input, save button, scenario chips with status dots, run-simulation button, and a live simulation log panel. Clicking a chip loads the full saved state and navigates to Building Workspace.
+- `ChatPanel.tsx` — Self-contained floating chat panel. Owns all chat state and Ollama model state. No chat state in parent components.
+- `SelectionPanel.tsx` — Bottom-centre panel with selected buildings, confirm/reset actions, and building cards.
+- `RightPanel.tsx` — Right floating panel for construction-type feature definition. Cascade dropdowns (refurbishment → detail → year range) unified into a single `handleCascadeChange(useType, mapboxType, field, value)` handler.
+- `MapView.tsx` — Thin map shell (~160 lines). Delegates to four focused hooks; renders `Source`/`Layer` pairs for building states. Accepts `fitToGeoJSON` for animated scenario restore.
 - `components/common/`
-  - `CollapsiblePanel.jsx` — Reusable shell for floating left/right bottom panels.
-  - `LabeledSelectField.jsx` — Reusable labelled select control.
-  - `LeftDockTab.jsx` — Reusable accordion tab wrapper for the left dock.
+  - `LabeledSelectField.tsx` — Reusable labelled select control.
+  - `LeftDockTab.tsx` — Reusable accordion tab wrapper for the left dock.
 
 #### Services & Utilities
 
-- `services/api.js` — API client wrappers for all backend endpoints (including `fetchOllamaModels`, `fetchScenarioStatus`, `sendChatMessage(message, model)`).
-- `utils/selection.js` — GeoJSON parsing, stable feature keys, Mapbox type normalisation.
-- `vite-env.d.ts` — Vite `import.meta.env` type declarations.
+- `services/api.ts` — Typed API client wrappers for all backend endpoints.
+- `utils/selection.ts` — GeoJSON parsing, stable feature keys, Mapbox type normalisation.
+- `utils/mapbox.js` — Mapbox building helpers (type extraction, feature normalisation, selection logic) and layer definitions (fill, outline, extrusion).
+- `vite-env.d.ts` — Vite `import.meta.env` types + ambient declarations for `@mapbox/mapbox-gl-draw` and `react-collapse`.
 
 #### Styles (`styles/`)
 
-Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `selection-panel.css`, `construction-panel.css`, `bottom-panels.css`, `techtree.css`, `common.css`, `base.css`, `_variables.css`.
+Token-driven CSS design system — all colors, spacing, radii, and transitions live in `_variables.css` as CSS custom properties. Each file covers one feature area.
+
+| File | Purpose |
+| --- | --- |
+| `_variables.css` | All design tokens (colors, spacing, radii, blur, transitions, button variants) |
+| `base.css` | HTML/body reset, global form element styles |
+| `layout.css` | App grid, map container, sidebar toggle |
+| `left-dock.css` | Left sidebar header, tabs, scenario chips, simulation log |
+| `chat-panel.css` | Floating chat window, messages, input bar |
+| `bottom-panels.css` | Floating panel container shell (selection + construction) |
+| `selection-panel.css` | Selected buildings list and building cards |
+| `construction-panel.css` | Construction phase UI, cascade dropdowns |
+| `common.css` | Shared button/input base classes, status indicators, utility classes |
+| `techtree.css` | Tech Tree ReactFlow canvas, layer bands, node pills |
+
+The app has two visual zones with distinct aesthetics:
+
+- **Dark zone** — left dock, tech tree background: navy/slate bg, light text, sky-blue accent.
+- **Light zone** — map-overlay panels (chat, right, selection): frosted glass, white cards, dark text.
+
+Button tokens (`--btn-dark-*`, `--btn-light-*`, `--btn-primary-*`, `--btn-success-*`, `--btn-danger-*`) and backdrop-blur/panel utilities in `common.css` keep the two zones consistent without mixing styles between files. See [`styles/README.md`](frontend/src/styles/README.md) for the full token catalogue and naming conventions.
 
 ### Backend (FastAPI — `reactapp.py`)
 
@@ -83,7 +110,7 @@ Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `se
 | `GET` | `/api/scenario-data/{name}` | Returns the `scenario.json` snapshot (GeoJSON + drawn polygon) for full client state restore. |
 | `POST` | `/api/save-scenario` | Saves building selection as CEA-4 compliant shapefiles + `scenario.json` snapshot in `scenarios/{name}-scenario/`. |
 | `POST` | `/api/export-cea-shp` | Converts selected GeoJSON into a CEA-4 shapefile ZIP for download. |
-| `POST` | `/api/select` | Backend selection endpoint based on drawn geometry (SHP workflow). |
+| `POST` | `/api/select` | Backend selection endpoint based on drawn geometry (SHP workflow only; dead if `USE_MAPBOX_BUILDINGS=true`). |
 | `POST` | `/api/chat` | Forwards prompts to Ollama with the requested model (`req.model`). |
 | `GET` | `/api/ollama-models` | Returns list of locally available Ollama models. |
 | `GET` | `/api/run-simulation` | SSE stream: runs the 8-step CEA pipeline for a named scenario. |
@@ -95,7 +122,7 @@ Split CSS per feature area: `layout.css`, `left-dock.css`, `chat-panel.css`, `se
 
 `GET /api/run-simulation?scenario_name=…` streams progress via **Server-Sent Events**. Each event is a JSON object `{ step, status, message? }`. The final event is `{ status: "complete" }` or `{ status: "failed" }`.
 
-Steps run in order, each as a subprocess of the CEA binary at `CEA_CMD` (default: `/home/salva/micromamba/envs/cea/bin/cea`):
+Steps run in order, each as a subprocess of the CEA binary at `CEA_CMD` (default: `cea`; override via env var):
 
 | Step | CEA command | What it does |
 | --- | --- | --- |
@@ -200,11 +227,14 @@ Frontend default URL: `http://localhost:5173`
 
 ## Environment Variables
 
-Backend (`reactapp/.env`):
+Backend (`reactapp/.env` — see `.env.example`):
 
-- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` (default: `llama3:latest`)
-- `CEA_CMD` (default: `/home/salva/micromamba/envs/cea/bin/cea`)
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CEA_CMD` | `cea` | Path to CEA CLI executable |
+| `CORS_ORIGINS` | localhost list | Comma-separated allowed origins |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base |
+| `OLLAMA_MODEL` | `llama3` | Default Ollama model |
 
 Frontend (`frontend/.env` if needed):
 
@@ -216,18 +246,17 @@ Frontend (`frontend/.env` if needed):
 
 ## Development Notes
 
-- `App.jsx` is a re-export shell pointing to `App.tsx`; do not add logic there.
 - All pages are kept mounted with `display: none` toggled on the wrapper div — never unmount pages to preserve state.
 - Navigation state lives in `states/navigationMachine.ts` (reducer) + `hooks/useNavigation.ts` (hook).
-- Scenario management and simulation state live in `App.tsx` so the LeftDock controls are accessible from any page.
-- Active selection state lives in `buildingSelection.tsx` and is surfaced to `App.tsx` via a callback ref (`onActiveSelectionChange`) to avoid unnecessary re-renders.
-- Derived state in `buildingSelection.tsx` (`lockedSelectionGeoJSONWithState`, `confirmedBuildingsWithAssignments`) must be `useMemo`-ised — inline object creation on every render caused an infinite re-render loop via the `onConstTypesChange` callback chain.
-- `ChatPanel.jsx` is fully self-contained — do not hoist chat or model state into parent components.
-- TypeScript is configured via `tsconfig.json` with `allowJs: true` so `.jsx` files coexist with `.tsx` without migration.
-- `vite-env.d.ts` provides `import.meta.env` types for Vite.
-- The Mapbox vendor chunk is large by nature; `vite.config.js` raises `build.chunkSizeWarningLimit` to suppress expected warnings.
+- Scenario state lives in `context/ScenarioContext.tsx` so `LeftDock` can access it without prop drilling from `App.tsx`.
+- Active selection state lives in `useBuildingSelection` and is surfaced to `App.tsx` via a callback ref (`onActiveSelectionChange`) to avoid unnecessary re-renders.
+- `ScenarioProvider` receives `getActiveSelection` and `getDrawnPolygon` as getter callbacks rather than stateful values — this means `saveScenario()` reads the current selection at call time without causing re-renders on every map interaction.
+- Derived state (`lockedSelectionGeoJSONWithState`, `confirmedBuildingsWithAssignments`) must stay `useMemo`-ised — inline object creation on every render caused an infinite re-render loop via the `onConstTypesChange` callback chain.
+- `ChatPanel.tsx` is fully self-contained — do not hoist chat or model state into parent components.
+- TypeScript is configured with `moduleResolution: "bundler"`. All source files are `.ts`/`.tsx` except `main.jsx` (entry point) and `utils/mapbox.js` (Mapbox layer definitions — kept `.js` to avoid layer type gymnastics).
+- `vite-env.d.ts` has ambient declarations for `@mapbox/mapbox-gl-draw` and `react-collapse` (neither ships types).
+- The Mapbox vendor chunk is large by nature; `vite.config.ts` raises `build.chunkSizeWarningLimit` to suppress expected warnings.
 - Keep mapping CSVs as source-of-truth; avoid hardcoding category logic in components.
-- The construction mapping parser tolerates CSV header variations (BOM, key-format differences).
 - CEA CLI flags use bare parameter names, not the `section:parameter` config format — `archetypes_mapper` reads from `zone.shp` directly via `get_zone_geometry()`, so all typology columns must be present in that file.
 - Tech Tree must only pass **active** nodes to ELK — passing all ~1 000 CEA nodes freezes the layout engine. Filter in `buildVisibleGraph` before calling `runElkLayout`.
 - `LayerOverlays` in `techTree.tsx` must be a child of `<ReactFlow>` (not a sibling) to access the `useViewport()` context for correct canvas-to-screen coordinate mapping.

@@ -29,7 +29,7 @@
   height: 44px;
   border-radius: 0px 5px 5px 0px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.95);
+  background: var(--color-dark-bg-95);
   color: #e2e8f0;
   font-weight: 700;
   cursor: pointer;

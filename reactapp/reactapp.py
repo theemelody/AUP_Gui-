@@ -11,7 +11,6 @@ from io import BytesIO
 
 import geopandas as gpd
 from shapely.geometry import shape
-from shapely.ops import unary_union
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,13 +27,17 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
 
 # CORS (for requests coming from the React dev server)
-origins = [
-    "http://localhost:5173",  # Vite default
-    "http://127.0.0.1:5173",
-    "http://0.0.0.0:5173",
-    "http://1.0.0.127:5173",
-    "http://localhost:3000",  # create-react-app default
-]
+_cors_env = os.getenv("CORS_ORIGINS", "")
+origins = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://0.0.0.0:5173",
+        "http://localhost:3000",
+    ]
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -46,7 +49,6 @@ app.add_middleware(
 # --- Data loading (equivalent to Streamlit's load_data) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, "frontend", ".env"), override=False)
-DATA_PATH = os.path.join(BASE_DIR, "..", "data", "OneNeighborhood.shp")
 MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH = os.path.join(
     BASE_DIR, "mappings", "MAPBOX_TO_CEA_USE_TYPE1.csv"
 )
@@ -143,34 +145,35 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 SCENARIOS_DIR = os.path.join(PROJECT_ROOT, "scenarios")
 DEFAULT_SCENARIO_PATH = os.path.join(SCENARIOS_DIR, "output-scenario")
 
-# app now runs fully on mapbox geometry. this initial dataset has been deprecated
-'''try:
-    gdf = gpd.read_file(DATA_PATH)
-    # Ensure we always serve WGS84 GeoJSON to the frontend map.
-    if gdf.crs is None and not gdf.empty:
-        minx, miny, maxx, maxy = gdf.total_bounds
-        if minx > 180 or maxx > 180 or miny > 90 or maxy > 90:
-            gdf = gdf.set_crs(epsg=32636)  # Turkey UTM 36N (meters)
-        else:
-            gdf = gdf.set_crs(epsg=4326)   # Already in degrees (WGS84)
-    gdf = gdf.to_crs(epsg=4326)
-except Exception as e:
-    raise RuntimeError(f"Data could not be loaded: {e}")
-'''
 class ChatRequest(BaseModel):
     message: str
     model: str | None = None
-
-class SelectRequest(BaseModel):
-    # Geometry drawn on map (Feature, FeatureCollection, or geometry object).
-    geometry: dict  # GeoJSON geometry
-
 
 class ExportCeaShpRequest(BaseModel):
     # Selected GeoJSON FeatureCollection created by the Mapbox selection pipeline.
     selected_geojson: dict
     scenario_name: str | None = None
     site_polygon: dict | None = None  # GeoJSON geometry object for site.shp (the area selection boundary)
+
+
+def _normalize_key(value: str) -> str:
+    return (
+        str(value or "")
+        .replace("\ufeff", "")
+        .strip()
+        .lower()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+
+def _read_row_value(row_dict: dict, aliases: list[str]) -> str:
+    normalized_aliases = {_normalize_key(alias) for alias in aliases}
+    for key, value in row_dict.items():
+        if _normalize_key(key) in normalized_aliases:
+            return str(value or "").strip()
+    return ""
 
 
 def load_mapbox_to_cea_use_type_mapping():
@@ -180,30 +183,12 @@ def load_mapbox_to_cea_use_type_mapping():
             f"Mapping file not found: {MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH}"
         )
 
-    def normalize_key(value: str) -> str:
-        return (
-            str(value or "")
-            .replace("\ufeff", "")
-            .strip()
-            .lower()
-            .replace(" ", "")
-            .replace("-", "")
-            .replace("_", "")
-        )
-
-    def read_row_value(row_dict: dict, aliases: list[str]) -> str:
-        normalized_aliases = {normalize_key(alias) for alias in aliases}
-        for key, value in row_dict.items():
-            if normalize_key(key) in normalized_aliases:
-                return str(value or "").strip()
-        return ""
-
     mapping = {}
     with open(MAPBOX_TO_CEA_USE_TYPE_MAPPING_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            mapbox_type = read_row_value(row, ["mapbox_type", "mapboxType"]).lower()
-            cea_type = read_row_value(
+            mapbox_type = _read_row_value(row, ["mapbox_type", "mapboxType"]).lower()
+            cea_type = _read_row_value(
                 row,
                 ["cea_use_type1", "ceaUseType1", "use_type", "useType"],
             ).upper()
@@ -296,42 +281,24 @@ def load_construction_type_mapping():
             f"Construction mapping file not found: {CONSTRUCTION_TYPE_MAPPING_PATH}"
         )
 
-    def normalize_key(value: str) -> str:
-        return (
-            str(value or "")
-            .replace("\ufeff", "")
-            .strip()
-            .lower()
-            .replace(" ", "")
-            .replace("-", "")
-            .replace("_", "")
-        )
-
-    def read_row_value(row_dict: dict, aliases: list[str]) -> str:
-        normalized_aliases = {normalize_key(alias) for alias in aliases}
-        for key, value in row_dict.items():
-            if normalize_key(key) in normalized_aliases:
-                return str(value or "").strip()
-        return ""
-
     rows = []
     with open(CONSTRUCTION_TYPE_MAPPING_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            const_type = read_row_value(row, ["const_type", "constType"])
-            refurb = read_row_value(
+            const_type = _read_row_value(row, ["const_type", "constType"])
+            refurb = _read_row_value(
                 row,
                 ["refurbishment_type", "refurbishmentType", "refurbishment"],
             )
-            detail = read_row_value(row, ["detail", "detail_type", "detailType"])
-            cea_use_type1 = read_row_value(
+            detail = _read_row_value(row, ["detail", "detail_type", "detailType"])
+            cea_use_type1 = _read_row_value(
                 row, ["cea_use_type1", "ceaUseType1", "use_type", "useType"]
             ).upper()
             if not (const_type and refurb and detail and cea_use_type1):
                 continue
             try:
-                year_start = int(read_row_value(row, ["year_start", "yearStart"]))
-                year_end = int(read_row_value(row, ["year_end", "yearEnd"]))
+                year_start = int(_read_row_value(row, ["year_start", "yearStart"]))
+                year_end = int(_read_row_value(row, ["year_end", "yearEnd"]))
             except (TypeError, ValueError):
                 continue
 
@@ -386,14 +353,35 @@ def normalize_scenario_name(value):
     return raw_name, os.path.join(SCENARIOS_DIR, folder_name)
 
 
+def _build_zone_record(row) -> dict:
+    """Build a CEA-4 compliant zone record dict from a GeoDataFrame row.
+
+    Reference: cea/datamanagement/format_helper/cea4_verify.py COLUMNS_ZONE_4
+    """
+    return {
+        "geometry":   row["geometry"],
+        "name":       row["name"],
+        "floors_bg":  int(row.get("floors_bg", 0)),
+        "floors_ag":  int(row["floors_ag"]),
+        "void_deck":  int(row.get("void_deck", 0)),
+        "height_bg":  float(row.get("height_bg", 0.0)),
+        "height_ag":  float(row["height_ag"]),
+        "year":       int(row.get("year", 2000)),
+        "const_type": str(row.get("const_type", "")),
+        "use_type1":  str(row.get("use_type1", "UNKNOWN")),
+        "use_type1r": float(row.get("use_type1r", 1.0)),
+        "use_type2":  str(row.get("use_type2", "NONE")),
+        "use_type2r": float(row.get("use_type2r", 0.0)),
+        "use_type3":  str(row.get("use_type3", "NONE")),
+        "use_type3r": float(row.get("use_type3r", 0.0)),
+    }
+
+
 def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
     """Create scenario directory structure and write zone/site shapefiles.
-    
-    Args:
-        scenario_path: Path to scenario directory
-        zone_gdf: GeoDataFrame with building polygons and full attributes
-        site_polygon: GeoJSON geometry object representing the area selection boundary.
-                     If None, uses union of buildings.
+
+    site_polygon: GeoJSON geometry object for the area selection boundary.
+                 If None, uses union of buildings.
     """
     os.makedirs(os.path.join(scenario_path, "inputs", "building-geometry"), exist_ok=True)
     os.makedirs(os.path.join(scenario_path, "inputs", "building-properties"), exist_ok=True)
@@ -403,29 +391,7 @@ def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
 
     geom_dir = os.path.join(scenario_path, "inputs", "building-geometry")
 
-    # Build CEA-4 compliant zone.shp: geometry + typology columns in one file.
-    # Reference: cea/datamanagement/format_helper/cea4_verify.py COLUMNS_ZONE_4
-    zone_data = []
-    for _, row in zone_gdf.iterrows():
-        zone_record = {
-            "geometry":   row["geometry"],
-            "name":       row["name"],
-            "floors_bg":  int(row.get("floors_bg", 0)),
-            "floors_ag":  int(row["floors_ag"]),
-            "void_deck":  int(row.get("void_deck", 0)),
-            "height_bg":  float(row.get("height_bg", 0.0)),
-            "height_ag":  float(row["height_ag"]),
-            "year":       int(row.get("year", 2000)),
-            "const_type": str(row.get("const_type", "")),
-            "use_type1":  str(row.get("use_type1", "UNKNOWN")),
-            "use_type1r": float(row.get("use_type1r", 1.0)),
-            "use_type2":  str(row.get("use_type2", "NONE")),
-            "use_type2r": float(row.get("use_type2r", 0.0)),
-            "use_type3":  str(row.get("use_type3", "NONE")),
-            "use_type3r": float(row.get("use_type3r", 0.0)),
-        }
-        zone_data.append(zone_record)
-
+    zone_data = [_build_zone_record(row) for _, row in zone_gdf.iterrows()]
     zone_gdf_cleaned = gpd.GeoDataFrame(zone_data, crs=zone_gdf.crs)
 
     # Write zone.shp
@@ -437,9 +403,9 @@ def prepare_scenario_structure(scenario_path, zone_gdf, site_polygon=None):
         try:
             site_geom = shape(site_polygon)
         except Exception:
-            site_geom = zone_gdf_cleaned.geometry.unary_union
+            site_geom = zone_gdf_cleaned.geometry.union_all()
     else:
-        site_geom = zone_gdf_cleaned.geometry.unary_union
+        site_geom = zone_gdf_cleaned.geometry.union_all()
 
     site_gdf = gpd.GeoDataFrame(geometry=[site_geom], crs=zone_gdf.crs)
     site_gdf.to_file(os.path.join(geom_dir, "site.shp"), encoding="UTF-8")
@@ -670,7 +636,7 @@ def build_projection_crs(gdf):
         return "EPSG:4326"
 
     wgs84 = gdf.to_crs(epsg=4326)
-    centroid = wgs84.unary_union.centroid
+    centroid = wgs84.union_all().centroid
     lon = float(centroid.x)
     lat = float(centroid.y)
     zone = int((lon + 180.0) // 6.0) + 1
@@ -874,29 +840,8 @@ def write_cea_zip_from_geojson(features):
     export_gdf = export_gdf.to_crs(projected_crs)
 
     tmpdir = tempfile.mkdtemp(prefix="cea-export-")
-    
-    # Build CEA-4 compliant zone.shp: geometry + typology columns in one file.
-    zone_data = []
-    for _, row in export_gdf.iterrows():
-        zone_record = {
-            "geometry":   row["geometry"],
-            "name":       row["name"],
-            "floors_bg":  int(row.get("floors_bg", 0)),
-            "floors_ag":  int(row["floors_ag"]),
-            "void_deck":  int(row.get("void_deck", 0)),
-            "height_bg":  float(row.get("height_bg", 0.0)),
-            "height_ag":  float(row["height_ag"]),
-            "year":       int(row.get("year", 2000)),
-            "const_type": str(row.get("const_type", "")),
-            "use_type1":  str(row.get("use_type1", "UNKNOWN")),
-            "use_type1r": float(row.get("use_type1r", 1.0)),
-            "use_type2":  str(row.get("use_type2", "NONE")),
-            "use_type2r": float(row.get("use_type2r", 0.0)),
-            "use_type3":  str(row.get("use_type3", "NONE")),
-            "use_type3r": float(row.get("use_type3r", 0.0)),
-        }
-        zone_data.append(zone_record)
 
+    zone_data = [_build_zone_record(row) for _, row in export_gdf.iterrows()]
     zone_gdf = gpd.GeoDataFrame(zone_data, crs=projected_crs)
 
     # Write zone.shp
@@ -931,6 +876,12 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
     conversion_base = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "COMPONENTS", "CONVERSION")
     feedstocks_base = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "COMPONENTS", "FEEDSTOCKS", "FEEDSTOCKS_LIBRARY")
     const_types_path = os.path.join(BASE_DIR, "..", "..", "CityEnergyAnalyst", "cea", "databases", region, "ARCHETYPES", "CONSTRUCTION", "CONSTRUCTION_TYPES.csv")
+
+    extra_desc_path = os.path.join(BASE_DIR, "mappings", "TECHTREE_EXTRA_DESCRIPTIONS.json")
+    extra_descriptions: dict = {}
+    if os.path.exists(extra_desc_path):
+        with open(extra_desc_path, encoding="utf-8") as _f:
+            extra_descriptions = json.load(_f)
 
     # L0 + L1 nodes from CONSTRUCTION_TYPES.csv
     if os.path.exists(const_types_path):
@@ -974,6 +925,8 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
                     continue
                 if code in nodes:
                     add_edge(code, family_id)
+                    if not nodes[code]["description"]:
+                        nodes[code]["description"] = str(row.get("description") or "").strip()
                 if has_primary:
                     comp = str(row.get("primary_components") or "").strip()
                     if comp and comp != "-":
@@ -1000,6 +953,8 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
                     code = str(row.get("code") or "").strip()
                     if not code or code not in nodes:
                         continue
+                    if not nodes[code]["description"]:
+                        nodes[code]["description"] = str(row.get("description") or "").strip()
                     if has_fuel:
                         fc = str(row.get("fuel_code") or "").strip()
                         fs = FUEL_CODE_TO_FEEDSTOCK.get(fc)
@@ -1009,14 +964,10 @@ def load_techtree_graph(region: str = "DE", scenario_name: str = "") -> dict:
                         add_node(fs, fs.capitalize(), 6, "l3.2")
                         add_edge(code, fs)
 
-    # Confirm L3.2 feedstock node descriptions from FEEDSTOCKS dir
-    if os.path.exists(feedstocks_base):
-        for fname in os.listdir(feedstocks_base):
-            if not fname.endswith(".csv"):
-                continue
-            fs_id = fname.replace(".csv", "").upper()
-            if fs_id in nodes:
-                nodes[fs_id]["description"] = fs_id.lower()
+    # Apply extra descriptions as fallback for nodes still missing a description
+    for node_id, node in nodes.items():
+        if not node["description"]:
+            node["description"] = extra_descriptions.get(node_id, "")
 
     # Active const_types from scenario zone.shp
     active_const_types: list[str] = []
@@ -1138,7 +1089,7 @@ SIMULATION_STEPS = [
 ]
 
 
-_logger = __import__("logging").getLogger("cea_pipeline")
+_logger = logging.getLogger("cea_pipeline")
 
 
 async def _cea_pipeline(scenario_path: str):
@@ -1200,14 +1151,6 @@ async def run_simulation(scenario_name: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-@app.get("/api/buildings")
-def get_buildings():
-    """
-    Returns all buildings as GeoJSON (for the map on the frontend).
-    """
-    return gdf.to_json()
-
 
 @app.get("/api/mapbox-cea-use-type-mapping")
 def get_mapbox_cea_use_type_mapping():
@@ -1289,7 +1232,7 @@ def save_scenario(req: ExportCeaShpRequest):
         prepare_scenario_structure(scenario_path, export_gdf, req.site_polygon)
 
         snapshot = {
-            "saved_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "saved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "scenario_name": scenario_raw_name,
             "selected_geojson": req.selected_geojson,
             "drawn_polygon": req.site_polygon,
@@ -1319,69 +1262,3 @@ def get_scenario_data(scenario_name: str):
         return json.load(_f)
 
 
-@app.post("/api/select")
-def select_buildings(req: SelectRequest):
-    """
-    Finds buildings intersecting with the drawn geometry and returns:
-    - selected building attributes
-    - shapefile ZIP encoded as base64.
-    """
-    try:
-        geo = req.geometry
-        geo_type = geo.get("type") if isinstance(geo, dict) else None
-
-        if geo_type == "FeatureCollection":
-            feature_geoms = [
-                shape(feature.get("geometry"))
-                for feature in geo.get("features", [])
-                if isinstance(feature, dict) and feature.get("geometry")
-            ]
-            if not feature_geoms:
-                return {
-                    "count": 0,
-                    "buildings": [],
-                    "selected_geojson": None,
-                    "zip_base64": None,
-                }
-            drawn_geom = unary_union(feature_geoms)
-        elif geo_type == "Feature":
-            drawn_geom = shape(geo.get("geometry"))
-        else:
-            drawn_geom = shape(geo)
-
-        selected = gdf[gdf.intersects(drawn_geom)]
-
-        # Empty selection
-        if selected.empty:
-            return {
-                "count": 0,
-                "buildings": [],
-                "selected_geojson": None,
-                "zip_base64": None,
-            }
-
-        # Non-geometry columns from the GeoDataFrame
-        df_props = selected.drop(columns="geometry")
-        buildings = df_props.to_dict(orient="records")
-
-        # Create shapefile ZIP
-        tmpdir = tempfile.mkdtemp()
-        shp_path = os.path.join(tmpdir, "selected_buildings.shp")
-        selected.to_file(shp_path)
-
-        zip_buffer = BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as z:
-            for f in os.listdir(tmpdir):
-                z.write(os.path.join(tmpdir, f), arcname=f)
-        zip_buffer.seek(0)
-
-        zip_b64 = base64.b64encode(zip_buffer.read()).decode("utf-8")
-
-        return {
-            "count": len(selected),
-            "buildings": buildings,
-            "selected_geojson": selected.to_json(),
-            "zip_base64": zip_b64,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

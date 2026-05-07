@@ -1,11 +1,25 @@
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface LabeledSelectFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: SelectOption[];
+  emptyLabel?: string;
+}
+
 function LabeledSelectField({
   id,
   label,
   value,
   onChange,
   options,
-  emptyLabel
-}) {
+  emptyLabel,
+}: LabeledSelectFieldProps) {
   const hasOptions = Array.isArray(options) && options.length > 0;
 
   return (

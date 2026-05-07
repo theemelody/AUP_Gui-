@@ -1,12 +1,15 @@
-function LeftDockTab({ id, title, active, onActivate, children }) {
+interface LeftDockTabProps {
+  id: string;
+  title: string;
+  active: boolean;
+  onActivate: () => void;
+  children?: React.ReactNode;
+}
+
+function LeftDockTab({ id, title, active, onActivate, children }: LeftDockTabProps) {
   return (
     <section
-      className={[
-        "left-dock-tab",
-        active ? "is-active" : ""
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      className={['left-dock-tab', active ? 'is-active' : ''].filter(Boolean).join(' ')}
     >
       <button
         type="button"

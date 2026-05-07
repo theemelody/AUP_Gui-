@@ -1,24 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Collapse } from "react-collapse";
-import { fetchOllamaModels, sendChatMessage } from "../services/api.js";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Collapse } from 'react-collapse';
+import { fetchOllamaModels, sendChatMessage } from '../services/api.js';
 
-const INITIAL_MESSAGE = {
-  role: "assistant",
-  text: "Hi! I am connected to Ollama. Ask me anything about your selected buildings.",
+interface Message {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+interface ChatPanelProps {
+  leftCollapsed: boolean;
+  setLeftCollapsed: (collapsed: boolean) => void;
+  activeSelectionCount: number;
+}
+
+const INITIAL_MESSAGE: Message = {
+  role: 'assistant',
+  text: 'Hi! I am connected to Ollama. Ask me anything about your selected buildings.',
 };
 
-function ChatPanel({
-  leftCollapsed,
-  setLeftCollapsed,
-  activeSelectionCount,
-}) {
-  const [availableModels, setAvailableModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [chatMessages, setChatMessages] = useState([INITIAL_MESSAGE]);
-  const [chatInput, setChatInput] = useState("");
+function ChatPanel({ leftCollapsed, setLeftCollapsed, activeSelectionCount: _ }: ChatPanelProps) {
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [chatMessages, setChatMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState(null);
-  const bottomRef = useRef(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchOllamaModels().then((models) => {
@@ -28,7 +35,7 @@ function ChatPanel({
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
 
   const handleSendChat = useCallback(async () => {
@@ -36,17 +43,14 @@ function ChatPanel({
     if (!message || chatLoading) return;
 
     setChatError(null);
-    setChatMessages((prev) => [...prev, { role: "user", text: message }]);
-    setChatInput("");
+    setChatMessages((prev) => [...prev, { role: 'user', text: message }]);
+    setChatInput('');
     setChatLoading(true);
     try {
       const reply = await sendChatMessage(message, selectedModel || undefined);
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: reply || "No response." },
-      ]);
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: reply || 'No response.' }]);
     } catch (e) {
-      setChatError(e?.message || "Chat request failed");
+      setChatError((e as Error)?.message || 'Chat request failed');
     } finally {
       setChatLoading(false);
     }
@@ -56,7 +60,7 @@ function ChatPanel({
     <section className="bottom-panel-left" aria-label="Chat">
       <div>
         <button type="button" className="action-link" onClick={() => setLeftCollapsed(!leftCollapsed)}>
-          {leftCollapsed ? "Show Chat" : "Hide Chat"}
+          {leftCollapsed ? 'Show Chat' : 'Hide Chat'}
         </button>
       </div>
       <Collapse isOpened={!leftCollapsed}>
@@ -80,14 +84,9 @@ function ChatPanel({
             {chatMessages.map((msg, idx) => (
               <div
                 key={idx}
-                className={[
-                  "chat-message",
-                  msg.role === "user" ? "chat-user" : "chat-assistant",
-                ].join(" ")}
+                className={['chat-message', msg.role === 'user' ? 'chat-user' : 'chat-assistant'].join(' ')}
               >
-                <div className="chat-role">
-                  {msg.role === "user" ? "You" : "Assistant"}
-                </div>
+                <div className="chat-role">{msg.role === 'user' ? 'You' : 'Assistant'}</div>
                 <div className="chat-text">{msg.text}</div>
               </div>
             ))}
@@ -109,7 +108,7 @@ function ChatPanel({
               placeholder="Type your message..."
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSendChat(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
             />
             <button
               type="button"

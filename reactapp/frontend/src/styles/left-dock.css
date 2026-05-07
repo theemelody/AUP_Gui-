@@ -2,8 +2,8 @@
 
 .left-dock {
   /* Main control sidebar for model, scenario, and actions. */
-  background: rgba(15, 23, 42, 0.95);
-  color: #dbeafe;
+  background: var(--color-dark-bg-95);
+  color: var(--color-dark-text);
   border-right: 1px solid var(--color-dark-border);
   padding: 0;
   overflow: hidden;
@@ -30,7 +30,7 @@
 .left-dock-title {
   font-weight: 700;
   font-size: var(--font-size-base);
-  color: #f8fafc;
+  color: var(--color-dark-text-bright);
 }
 
 .left-dock-toggle {
@@ -38,7 +38,7 @@
   height: 30px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.95);
+  background: var(--color-dark-bg-95);
   color: #e2e8f0;
   cursor: pointer;
 }
@@ -55,7 +55,7 @@
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--color-dark-border);
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--color-dark-bg-55);
 }
 
 .left-dock-tab.is-active {
@@ -68,7 +68,7 @@
   padding: 0 var(--spacing-lg);
   border: none;
   background: transparent;
-  color: #f8fafc;
+  color: var(--color-dark-text-bright);
   text-align: left;
   font-size: var(--font-size-sm);
   font-weight: 800;
@@ -98,8 +98,8 @@
   min-height: 140px;
   border-radius: 10px;
   border: 1px solid var(--color-dark-border);
-  background: rgba(2, 6, 23, 0.45);
-  color: #94a3b8;
+  background: var(--color-dark-subtle);
+  color: var(--color-dark-text-muted);
   font-size: var(--font-size-sm);
   display: flex;
   align-items: center;
@@ -113,12 +113,12 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--color-dark-bg-55);
 }
 
 .left-dock-section-title {
   font-size: var(--font-size-sm);
-  color: #93c5fd;
+  color: var(--color-accent-blue);
   font-weight: 700;
   margin-bottom: var(--spacing-md);
   text-transform: uppercase;
@@ -146,21 +146,6 @@
   margin-bottom: var(--spacing-sm);
 }
 
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-on {
-  background: #22c55e;
-}
-
-.status-off {
-  background: #ef4444;
-}
-
 .left-dock-chip {
   border: 1px solid var(--color-dark-border);
   border-radius: var(--radius-sm);
@@ -172,7 +157,7 @@
 
 .left-dock-muted {
   font-size: var(--font-size-sm);
-  color: #94a3b8;
+  color: var(--color-dark-text-muted);
   margin-bottom: var(--spacing-md);
 }
 
@@ -185,54 +170,12 @@
   margin-bottom: var(--spacing-md);
 }
 
-.scenario-input {
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(2, 6, 23, 0.8);
-  color: #e2e8f0;
-  padding: 0 var(--spacing-lg);
-  font-size: var(--font-size-sm);
-}
-
-.scenario-save-btn {
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(56, 189, 248, 0.25);
-  color: #dbeafe;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0 var(--spacing-lg);
-}
-
-.scenario-save-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* Saved Scenarios */
 
 .saved-scenarios-inline {
   margin-bottom: var(--spacing-md);
   max-height: 120px;
   overflow: auto;
-}
-
-/* Action Buttons */
-
-.left-dock-run-btn {
-  width: 100%;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--color-dark-border);
-  background: rgba(34, 197, 94, 0.18);
-  color: #dcfce7;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.left-dock-run-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 /* Scenario chips — clickable with status indicator */
@@ -255,17 +198,6 @@
   background: rgba(15, 23, 42, 0.8);
 }
 
-.scenario-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.scenario-status-dot.complete   { background: #22c55e; }
-.scenario-status-dot.ready      { background: #f59e0b; }
-.scenario-status-dot.incomplete { background: #94a3b8; }
-
 /* Simulation log */
 
 .simulation-log {
@@ -287,31 +219,31 @@
   display: inline-block;
 }
 
-.sim-log-running .sim-log-icon { color: #f0a500; animation: spin 1s linear infinite; }
-.sim-log-done    .sim-log-icon { color: #22c55e; }
-.sim-log-error   .sim-log-icon { color: #ef4444; }
-.sim-log-idle    .sim-log-icon { color: #94a3b8; }
+.sim-log-running .sim-log-icon { color: var(--color-status-running); animation: spin 1s linear infinite; }
+.sim-log-done    .sim-log-icon { color: var(--color-status-success); }
+.sim-log-error   .sim-log-icon { color: var(--color-status-error); }
+.sim-log-idle    .sim-log-icon { color: var(--color-dark-text-muted); }
 
 .sim-log-label { color: #cbd5e1; }
 
 .sim-log-detail {
   margin: 2px 0 4px 20px;
   font-size: var(--font-size-xs);
-  color: #fca5a5;
+  color: var(--color-text-error-light);
   word-break: break-all;
   line-height: 1.35;
 }
 
 .sim-log-complete {
   margin-top: var(--spacing-sm);
-  color: #22c55e;
+  color: var(--color-status-success);
   font-weight: 600;
   font-size: var(--font-size-sm);
 }
 
 .sim-log-failed {
   margin-top: var(--spacing-sm);
-  color: #ef4444;
+  color: var(--color-status-error);
   font-weight: 600;
   font-size: var(--font-size-sm);
 }

@@ -1,79 +1,222 @@
-/* === COMMON COMPONENTS & UTILITIES === */
+/* === COMMON COMPONENTS & UTILITIES ===
+ *
+ * Visual zones:
+ *   Dark zone  — left dock, TechTree: navy bg, light text, sky-blue accent
+ *   Light zone — map overlay panels: frosted glass, white cards, dark text
+ *
+ * Action hierarchy:
+ *   Primary   (.btn-primary)  — save / confirm: sky-blue tint
+ *   Success   (.btn-success)  — run simulation: green tint
+ *   Dark      (.btn-dark)     — dark zone secondary actions
+ *   Light     (.btn-light)    — light zone secondary actions
+ *   Danger    (.btn-danger)   — destructive actions: red tint
+ */
 
-/* Action Links */
+/* ── Button base (shared across all buttons) ──────────────────────────────── */
 
-.action-link {
+.action-button,
+.action-link,
+.scenario-save-btn,
+.left-dock-run-btn,
+.chat-send-btn,
+.tt-filter-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 34px;
   padding: 0 var(--spacing-lg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--color-light-border);
-  background: rgba(255, 255, 255, 0.6);
-  -webkit-backdrop-filter: var(--blur-sm);
-  backdrop-filter: var(--blur-sm);
-  color: var(--color-light-text);
-  text-decoration: none;
   font-weight: 700;
-  font-size: 13px;
-  transition: background 180ms ease;
-}
-
-.action-link:hover {
-  background: rgba(255, 255, 255, 0.78);
-}
-
-.action-link.is-disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* Action Buttons */
-
-.action-button {
-  height: 34px;
-  padding: 0 var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-light-border);
-  background: rgba(15, 23, 42, 0.88);
-  color: white;
-  font-weight: 750;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
   cursor: pointer;
-  transition: background 180ms ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.action-button:hover {
-  background: rgba(15, 23, 42, 0.95);
-}
-
-.action-button:disabled {
+.action-button:disabled,
+.action-link.is-disabled,
+.scenario-save-btn:disabled,
+.left-dock-run-btn:disabled,
+.chat-send-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* Status Indicator */
+/* ── Button variants ──────────────────────────────────────────────────────── */
 
-.status-indicator {
+/* Dark zone solid — generic secondary action in dark panels */
+.action-button,
+.btn-dark {
+  border: 1px solid var(--color-light-border);
+  background: var(--btn-dark-bg);
+  color: var(--btn-dark-color);
+  text-decoration: none;
+}
+
+.action-button:hover,
+.btn-dark:hover {
+  background: var(--btn-dark-bg-hover);
+}
+
+/* Light zone glass — generic secondary action in light panels */
+.action-link,
+.btn-light {
+  border: 1px solid var(--color-light-border);
+  background: var(--btn-light-bg);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  color: var(--btn-light-color);
+  text-decoration: none;
+}
+
+.action-link:hover,
+.btn-light:hover {
+  background: var(--btn-light-bg-hover);
+}
+
+/* Primary — sky-blue tint (save scenario, send chat) */
+.btn-primary,
+.scenario-save-btn,
+.chat-send-btn {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-color);
+}
+
+.btn-primary:hover,
+.scenario-save-btn:hover,
+.chat-send-btn:hover {
+  background: rgba(56, 189, 248, 0.38);
+}
+
+/* Success — green tint (run simulation) */
+.btn-success,
+.left-dock-run-btn {
+  border: 1px solid var(--color-dark-border);
+  background: var(--btn-success-bg);
+  color: var(--btn-success-color);
+}
+
+.btn-success:hover,
+.left-dock-run-btn:hover {
+  background: rgba(34, 197, 94, 0.28);
+}
+
+/* Danger — red tint (clear filter, reset) */
+.btn-danger,
+.tt-filter-clear {
+  border: 1px solid var(--btn-danger-border);
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-color);
+}
+
+.btn-danger:hover,
+.tt-filter-clear:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+/* ── Input base ───────────────────────────────────────────────────────────── */
+
+.scenario-input,
+.chat-input,
+.chat-model-select,
+.construction-select {
+  height: 34px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  padding: 0 var(--spacing-lg);
+}
+
+/* Dark zone inputs (dock, chat) */
+.scenario-input,
+.chat-input,
+.chat-model-select {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.8);
+  color: #e2e8f0;
+}
+
+/* Light zone inputs (construction panel) */
+.construction-select {
+  width: 100%;
+  border: 1px solid var(--color-light-border-strong);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-light-text);
+  margin-bottom: var(--spacing-md);
+}
+
+/* ── Panel blur utility ───────────────────────────────────────────────────── */
+
+.panel-blur {
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+}
+
+/* ── Panel header utility ─────────────────────────────────────────────────── */
+
+.panel-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  padding: 0 var(--spacing-lg);
+}
+
+/* ── Status dot (unified) ─────────────────────────────────────────────────── */
+
+.status-dot,
+.status-indicator,
+.scenario-status-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.status-indicator.success {
+/* Semantic color modifiers */
+.status-dot.success,    .status-indicator.success,
+.status-on,             .scenario-status-dot.complete {
   background: var(--color-status-success);
 }
 
-.status-indicator.error {
+.status-dot.error,      .status-indicator.error,
+.status-off,            .scenario-status-dot.incomplete {
   background: var(--color-status-error);
 }
 
-.status-indicator.warning {
-  background: var(--color-status-warning);
+.status-dot.warning,    .status-indicator.warning,
+.scenario-status-dot.ready {
+  background: var(--color-status-amber);
 }
 
-.status-indicator.info {
-  background: var(--color-status-info);
+.status-dot.running {
+  background: var(--color-status-running);
+}
+
+.status-dot.muted,      .status-indicator.info,
+.scenario-status-dot.missing {
+  background: var(--color-dark-text-muted);
+}
+
+/* ── Map overlay positions ────────────────────────────────────────────────── */
+
+.map-overlay-top-left {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+}
+
+.map-overlay-error {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  font-size: var(--font-size-sm);
+  max-width: 420px;
 }

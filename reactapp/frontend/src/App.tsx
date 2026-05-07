@@ -1,7 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import LeftDock from './components/LeftDock.jsx';
 import { useNavigation } from './hooks/useNavigation';
-import { fetchScenarios, fetchScenarioStatus, fetchScenarioData, saveScenarioBuildings } from './services/api.js';
+import { ScenarioProvider, useScenarioContext } from './context/ScenarioContext';
 import type { ActiveSelectionInfo } from './pages/buildingSelection';
 import type { PageId } from './states/navigationMachine';
 
@@ -11,199 +11,48 @@ const KPI = lazy(() => import('./pages/kpi'));
 const SECAP = lazy(() => import('./pages/secap'));
 
 const PAGE_FALLBACK = (
-  <div className="map-overlay" style={{ position: 'absolute', left: 12, top: 12 }}>
+  <div className="map-overlay map-overlay-top-left">
     Loading...
   </div>
 );
 
-type StepStatus = 'idle' | 'running' | 'done' | 'error';
-type LogEntry = { step: string; status: StepStatus; messages: string[] };
-type SimStatus = 'idle' | 'running' | 'done' | 'failed';
-type ScenarioStatus = 'complete' | 'ready' | 'incomplete' | 'missing';
+interface AppContentProps {
+  activePage: PageId;
+  navigate: (page: PageId) => void;
+  activeSelectionRef: React.RefObject<ActiveSelectionInfo | null>;
+  drawnPolygonRef: React.RefObject<unknown>;
+}
 
-function App() {
-  const { activePage, navigate } = useNavigation();
+function AppContent({ activePage, navigate, activeSelectionRef, drawnPolygonRef }: AppContentProps) {
   const [sidebarHidden, setSidebarHidden] = useState(false);
-
-  // Scenario management state
-  const [scenarioName, setScenarioName] = useState('');
-  const [confirmedScenarioName, setConfirmedScenarioName] = useState('');
-  const [savedScenarios, setSavedScenarios] = useState<string[]>([]);
   const [hasSelection, setHasSelection] = useState(false);
   const [activeConstTypes, setActiveConstTypes] = useState<string[]>([]);
+  const [buildingCountByConstType, setBuildingCountByConstType] = useState<Record<string, number>>({});
 
-  // Scenario simulation selection + status
-  const [selectedScenarioForSim, setSelectedScenarioForSim] = useState('');
-  const [scenarioStatuses, setScenarioStatuses] = useState<Record<string, ScenarioStatus>>({});
-  const [loadedScenario, setLoadedScenario] = useState<{
-    geojson: unknown;
-    drawnPolygon: unknown;
-  } | null>(null);
-
-  // Simulation SSE state
-  const [simulationLog, setSimulationLog] = useState<LogEntry[]>([]);
-  const [simulationStatus, setSimulationStatus] = useState<SimStatus>('idle');
-  const esRef = useRef<EventSource | null>(null);
-
-  // Selection/polygon refs updated by BuildingSelection via callbacks
-  const activeSelectionRef = useRef<ActiveSelectionInfo | null>(null);
-  const drawnPolygonRef = useRef<unknown>(null);
+  const { confirmedScenarioName, loadedScenario } = useScenarioContext();
 
   const handleActiveSelectionChange = useCallback(
     (info: ActiveSelectionInfo | null) => {
       activeSelectionRef.current = info;
       setHasSelection(Boolean(info?.count && info.count > 0));
     },
-    [],
+    [activeSelectionRef],
   );
 
-  const handleDrawnPolygonChange = useCallback((polygon: unknown) => {
-    drawnPolygonRef.current = polygon;
-  }, []);
-
-  const handleSaveScenario = useCallback(async () => {
-    const name = scenarioName.trim();
-    if (!name) return;
-    const sel = activeSelectionRef.current;
-    if (!sel?.selectedGeoJSON || !sel?.count) {
-      alert('Please select buildings first before saving a scenario.');
-      return;
-    }
-    try {
-      const result = await saveScenarioBuildings(
-        sel.selectedGeoJSON,
-        name,
-        drawnPolygonRef.current,
-      );
-      if (result.success) {
-        setSavedScenarios((prev: string[]) =>
-          prev.includes(name) ? prev : [name, ...prev].slice(0, 8),
-        );
-        setConfirmedScenarioName(name);
-        // Refresh status for the newly saved scenario
-        fetchScenarioStatus(name).then((status) =>
-          setScenarioStatuses((prev) => ({ ...prev, [name]: status as ScenarioStatus })),
-        );
-        alert(`Scenario '${name}' saved successfully to ${result.scenario_path}`);
-      }
-    } catch (e) {
-      alert((e as Error)?.message || 'Failed to save scenario');
-    }
-  }, [scenarioName]);
-
-  const handleSelectScenarioChip = useCallback(async (name: string) => {
-    setSelectedScenarioForSim(name);
-    if (!name) { setLoadedScenario(null); return; }
-    try {
-      const data = await fetchScenarioData(name);
-      setLoadedScenario({ geojson: data.selected_geojson, drawnPolygon: data.drawn_polygon });
-      setConfirmedScenarioName(name);
-      navigate('simulation' as PageId);
-    } catch (e) {
-      console.warn('[App] scenario.json not found, skipping load:', e);
-    }
-  }, [navigate]);
-
-  const runSimulation = useCallback(() => {
-    const name = selectedScenarioForSim;
-    if (!name) return;
-
-    esRef.current?.close();
-    setSimulationLog([]);
-    setSimulationStatus('running');
-
-    const es = new EventSource(`/api/run-simulation?scenario_name=${encodeURIComponent(name)}`);
-    esRef.current = es;
-
-    es.onmessage = (evt) => {
-      const data = JSON.parse(evt.data);
-
-      if (data.status === 'complete' || data.status === 'failed') {
-        setSimulationStatus(data.status === 'complete' ? 'done' : 'failed');
-        if (data.status === 'complete') {
-          setScenarioStatuses((prev) => ({ ...prev, [name]: 'complete' }));
-        }
-        es.close();
-        return;
-      }
-
-      setSimulationLog((prev) => {
-        const idx = prev.findIndex((e) => e.step === data.step);
-        const entry: LogEntry =
-          idx >= 0
-            ? {
-                ...prev[idx],
-                status: data.status,
-                messages: data.message
-                  ? [...prev[idx].messages, data.message]
-                  : prev[idx].messages,
-              }
-            : {
-                step: data.step,
-                status: data.status,
-                messages: data.message ? [data.message] : [],
-              };
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = entry;
-          return next;
-        }
-        return [...prev, entry];
-      });
-    };
-
-    es.onerror = () => {
-      setSimulationStatus('failed');
-      es.close();
-    };
-  }, [selectedScenarioForSim]);
-
-  // Load saved scenarios on mount
-  useEffect(() => {
-    fetchScenarios()
-      .then((names) => setSavedScenarios(names))
-      .catch(() => {/* silently ignore if backend is not running */});
-  }, []);
-
-  // Refresh scenario statuses whenever the list changes
-  useEffect(() => {
-    if (!savedScenarios.length) return;
-    savedScenarios.forEach((name) => {
-      fetchScenarioStatus(name)
-        .then((status) =>
-          setScenarioStatuses((prev) => ({ ...prev, [name]: status as ScenarioStatus })),
-        )
-        .catch(() => {/* ignore */});
-    });
-  }, [savedScenarios]);
-
-  const activeScenarioName = confirmedScenarioName || scenarioName.trim();
-  const activeScenarioPath = activeScenarioName
-    ? `scenarios/${activeScenarioName}-scenario`
-    : '';
+  const handleDrawnPolygonChange = useCallback(
+    (polygon: unknown) => { drawnPolygonRef.current = polygon; },
+    [drawnPolygonRef],
+  );
 
   return (
     <div
-      className={['app-root', sidebarHidden ? 'sidebar-hidden' : '']
-        .filter(Boolean)
-        .join(' ')}
+      className={['app-root', sidebarHidden ? 'sidebar-hidden' : ''].filter(Boolean).join(' ')}
     >
       <LeftDock
         sidebarHidden={sidebarHidden}
         activePage={activePage}
-        onNavigate={navigate as (page: PageId) => void}
-        scenarioName={scenarioName}
-        setScenarioName={setScenarioName}
-        handleSaveScenario={handleSaveScenario}
-        savedScenarios={savedScenarios}
-        scenarioPath={activeScenarioPath}
+        onNavigate={navigate}
         hasSelection={hasSelection}
-        runSimulation={runSimulation}
-        selectedScenarioForSim={selectedScenarioForSim}
-        setSelectedScenarioForSim={handleSelectScenarioChip}
-        scenarioStatuses={scenarioStatuses}
-        simulationLog={simulationLog}
-        simulationStatus={simulationStatus}
       />
 
       <div className="center-column">
@@ -222,6 +71,7 @@ function App() {
               onActiveSelectionChange={handleActiveSelectionChange}
               onDrawnPolygonChange={handleDrawnPolygonChange}
               onConstTypesChange={setActiveConstTypes}
+              onBuildingCountsChange={setBuildingCountByConstType}
               loadedScenario={loadedScenario}
             />
           </Suspense>
@@ -232,21 +82,40 @@ function App() {
               activeConstTypes={activeConstTypes}
               scenarioName={confirmedScenarioName}
               isActive={activePage === 'tech-tree'}
+              buildingCountByConstType={buildingCountByConstType}
+              totalBuildings={Object.values(buildingCountByConstType).reduce((a, b) => a + b, 0)}
             />
           </Suspense>
         </div>
         <div style={{ display: activePage === 'kpi' ? undefined : 'none' }}>
-          <Suspense fallback={PAGE_FALLBACK}>
-            <KPI />
-          </Suspense>
+          <Suspense fallback={PAGE_FALLBACK}><KPI /></Suspense>
         </div>
         <div style={{ display: activePage === 'secap' ? undefined : 'none' }}>
-          <Suspense fallback={PAGE_FALLBACK}>
-            <SECAP />
-          </Suspense>
+          <Suspense fallback={PAGE_FALLBACK}><SECAP /></Suspense>
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  const { activePage, navigate } = useNavigation();
+  const activeSelectionRef = useRef<ActiveSelectionInfo | null>(null);
+  const drawnPolygonRef = useRef<unknown>(null);
+
+  return (
+    <ScenarioProvider
+      navigate={navigate as (page: PageId) => void}
+      getActiveSelection={() => activeSelectionRef.current}
+      getDrawnPolygon={() => drawnPolygonRef.current}
+    >
+      <AppContent
+        activePage={activePage}
+        navigate={navigate as (page: PageId) => void}
+        activeSelectionRef={activeSelectionRef}
+        drawnPolygonRef={drawnPolygonRef}
+      />
+    </ScenarioProvider>
   );
 }
 

@@ -3,7 +3,7 @@
 .techtree-root {
   position: absolute;
   inset: 0;
-  background: var(--color-dark-bg, #0f172a);
+  background: var(--color-dark-bg);
   overflow: hidden;
 }
 
@@ -12,26 +12,11 @@
   height: 100%;
 }
 
-/* ── layer band labels (left sidebar) ───────────────────────────────────── */
-
-.techtree-layer-label {
-  position: absolute;
-  left: 8px;
-  z-index: 10;
-  pointer-events: none;
-  font-size: var(--font-size-xs, 11px);
-  font-weight: 600;
-  color: var(--color-dark-text-muted, #94a3b8);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  writing-mode: horizontal-tb;
-}
-
 /* ── regular tech node ───────────────────────────────────────────────────── */
 
 .tech-node {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
@@ -39,24 +24,87 @@
   border: 1.5px solid rgba(148, 163, 184, 0.25);
   background: rgba(30, 41, 59, 0.85);
   font-size: 11px;
-  font-family: var(--font-stack, monospace);
-  color: var(--color-dark-text, #dbeafe);
+  font-family: var(--font-stack);
+  color: var(--color-dark-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 130px;
-  transition: opacity var(--transition-fast, 180ms ease);
-  cursor: default;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .tech-node--active {
-  border-color: var(--color-accent-sky, #38bdf8);
+  border-color: var(--color-accent-sky);
   background: rgba(56, 189, 248, 0.12);
   color: #e0f2fe;
 }
 
+.tech-node--active:hover {
+  background: rgba(56, 189, 248, 0.2);
+}
+
 .tech-node--inactive {
   opacity: 0.22;
+}
+
+.tech-node--dimmed {
+  opacity: 0.1;
+}
+
+/* ── expanded node card ──────────────────────────────────────────────────── */
+
+.tech-node--expanded {
+  white-space: normal;
+  max-width: 130px;
+  width: 130px;
+  min-height: 130px;
+  justify-content: flex-start;
+  padding: 6px 8px;
+  border-width: 2px;
+  cursor: pointer;
+}
+
+.tech-node__label {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.tech-node--expanded .tech-node__label {
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.tech-node__count {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(56, 189, 248, 0.8);
+  text-align: center;
+  width: 100%;
+  margin-bottom: 3px;
+  flex-shrink: 0;
+}
+
+.tech-node__desc {
+  font-size: 9.5px;
+  line-height: 1.45;
+  color: rgba(219, 234, 254, 0.75);
+  overflow-y: auto;
+  max-height: 90px;
+  width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  font-family: var(--font-stack);
+}
+
+.tech-node__desc--empty {
+  color: rgba(148, 163, 184, 0.4);
+  font-style: italic;
 }
 
 /* ── sublayer pill (collapsed group) ────────────────────────────────────── */
@@ -67,15 +115,15 @@
   gap: 6px;
   padding: 6px 14px;
   border-radius: 20px;
-  border: 2px solid #555;
+  /* border-color set via inline style={{ borderColor: sublayerColor }} */
+  border: 2px solid var(--color-dark-text-muted);
   background: rgba(15, 23, 42, 0.9);
   font-size: 11px;
-  font-family: var(--font-stack, monospace);
-  color: var(--color-dark-text, #dbeafe);
+  font-family: var(--font-stack);
+  color: var(--color-dark-text);
   white-space: nowrap;
   cursor: pointer;
-  transition: opacity var(--transition-fast, 180ms ease),
-              background var(--transition-fast, 180ms ease);
+  transition: opacity var(--transition-fast), background var(--transition-fast);
 }
 
 .sublayer-pill:hover {
@@ -101,8 +149,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-sm, 12px);
-  color: var(--color-dark-text-muted, #94a3b8);
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-text-muted);
   pointer-events: none;
 }
 
@@ -110,15 +158,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-status-error, #ef4444);
-  font-size: var(--font-size-sm, 12px);
+  color: var(--color-status-error);
+  font-size: var(--font-size-sm);
   padding: 24px;
 }
 
 /* ── react-flow overrides ────────────────────────────────────────────────── */
 
 .techtree-root .react-flow__node {
-  /* prevent react-flow default padding from interfering */
   padding: 0;
   border: none;
   background: transparent;
@@ -130,4 +177,271 @@
   height: 6px;
   background: rgba(148, 163, 184, 0.3);
   border: none;
+}
+
+/* ── filter toggle button ────────────────────────────────────────────────── */
+
+.tt-filter-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  background: var(--btn-dark-bg);
+  font-size: 15px;
+  color: rgba(203, 213, 225, 0.7);
+  /* transition inherited from common.css button base */
+}
+
+.tt-filter-toggle:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: var(--color-dark-text);
+}
+
+.tt-filter-toggle--open {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(30, 41, 59, 0.95);
+  color: var(--color-accent-blue);
+}
+
+.tt-filter-toggle--active {
+  border-color: rgba(56, 189, 248, 0.6);
+  color: var(--color-accent-sky);
+}
+
+.tt-filter-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--color-accent-sky);
+  color: var(--color-dark-bg);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-stack);
+}
+
+/* ── filter panel ────────────────────────────────────────────────────────── */
+
+.tt-filter-panel {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  z-index: 20;
+  width: 240px;
+  max-height: calc(100% - 72px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  background: rgba(10, 17, 32, 0.96);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  overflow: hidden;
+  font-family: var(--font-stack);
+  font-size: 11px;
+}
+
+.tt-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  flex-shrink: 0;
+}
+
+.tt-filter-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-dark-text-muted);
+}
+
+/* .tt-filter-clear styles handled by common.css .btn-danger */
+
+.tt-filter-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── filter accordion section ────────────────────────────────────────────── */
+
+.tt-filter-section {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.tt-filter-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: rgba(203, 213, 225, 0.75);
+  font-size: 10.5px;
+  font-family: var(--font-stack);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-quick);
+}
+
+.tt-filter-section-header:hover {
+  background: rgba(30, 41, 59, 0.6);
+  color: var(--color-dark-text);
+}
+
+.tt-filter-section-header--open {
+  color: var(--color-dark-text);
+}
+
+.tt-filter-chevron {
+  font-size: 8px;
+  opacity: 0.6;
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.tt-filter-section-label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.tt-filter-section-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(148, 163, 184, 0.5);
+  font-size: 9.5px;
+}
+
+.tt-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: rgba(56, 189, 248, 0.85);
+  color: var(--color-dark-bg);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+/* ── filter section body ─────────────────────────────────────────────────── */
+
+.tt-filter-section-body {
+  padding: 4px 0 6px;
+}
+
+.tt-filter-search {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.7);
+  color: var(--color-dark-text);
+  font-size: 10px;
+  font-family: var(--font-stack);
+  outline: none;
+  transition: border-color var(--transition-quick);
+}
+
+.tt-filter-search:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.tt-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tt-filter-item {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 10px 3px 8px;
+  cursor: pointer;
+  transition: background var(--transition-quick);
+}
+
+.tt-filter-item:hover {
+  background: rgba(30, 41, 59, 0.6);
+}
+
+.tt-filter-item input[type="checkbox"] {
+  display: none;
+}
+
+.tt-filter-item:has(input:checked) {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.tt-filter-item-id {
+  color: rgba(219, 234, 254, 0.85);
+  font-size: 10px;
+  font-weight: 500;
+  padding-left: 4px;
+  border-left: 2px solid transparent;
+  transition: border-color var(--transition-quick);
+}
+
+.tt-filter-item:has(input:checked) .tt-filter-item-id {
+  color: var(--color-accent-sky);
+  border-left-color: var(--color-accent-sky);
+}
+
+.tt-filter-item-desc {
+  display: block;
+  padding-left: 6px;
+  margin-top: 1px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: rgba(148, 163, 184, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-filter-empty {
+  display: block;
+  padding: 6px 10px;
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.35);
+  font-style: italic;
+}
+
+/* ── layer band overlays ─────────────────────────────────────────────────── */
+
+/* Band containers are positioned with inline styles (computed from ELK layout).
+   Static properties live here; dynamic top/height/background stay in JSX. */
+.layer-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.layer-band__label {
+  position: absolute;
+  left: 10px;
+  top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-stack);
+  white-space: nowrap;
+  user-select: none;
 }
