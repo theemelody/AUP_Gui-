@@ -32,6 +32,7 @@ The app uses a multi-page architecture where each workspace is a separate page c
 #### Context (`context/`)
 
 - `ScenarioContext.tsx` — Holds all scenario state: name, saved list, statuses, simulation log/status, loaded scenario. Provides `saveScenario()`, `selectScenarioForSim()`, and `runSimulation()` actions. `LeftDock` reads directly from this context — no prop drilling.
+- `SecapContext.tsx` — Full SECAP state machine. Manages 6 `ChapterState` objects (content, savedContent, isDirty, model, status, lockedRanges, error, contextTokens). Exposes: `setChapterContent`, `setChapterModel`, `saveChapter(id, contentOverride?)`, `generateChapter`, `stopChapter`, `postComment`, `addLockedRange`, `removeLockedRange`, `getFullText`, `loadAllChapters`, `dismissNotification`. Mounted at `App.tsx` level (alongside `ScenarioProvider`) so `SecapDockSection` inside `LeftDock` always has context. Auto-loads chapters when `confirmedScenarioName` changes.
 
 #### Hooks (`hooks/`)
 
@@ -41,6 +42,8 @@ The app uses a multi-page architecture where each workspace is a separate page c
 - `useMapbox3D.ts` — Initialises terrain DEM, sky atmosphere, and 3D basemap buildings layer on first map load.
 - `useMapboxDraw.ts` — Full `MapboxDraw` lifecycle: initialisation, `fireSelection` debounced callback, phase-aware routing between initial selection and construction-area sub-selection, draw button visibility, stale shape cleanup.
 - `useMapboxFit.ts` — Exposes `fitToBounds` utility; owns the `fitToGeoJSON` fly-to effect for scenario restore.
+- `useTextSelection.ts` — Wraps the browser `Selection` API. On `mouseup` inside an editor wrap, captures the selected text and computes anchor coordinates for the `SecapCommentPopover`. Exposes `{ selection, onSelectionChange, clearSelection }`.
+- `useChapterResize.ts` — Tracks `mousedown` drag events on separator `<div>` elements and mutates CSS custom properties (`--secap-row1-height`, `--secap-full-height`) on the grid container, achieving zero-dependency panel resizing consistent with the no-layout-library philosophy.
 
 #### Pages (`pages/`)
 
@@ -60,11 +63,11 @@ All pages are lazy-loaded and persistently mounted.
   - **Tech Potentials** — PV vs total demand, PVT + SC thermal bar, renewable-mix donut, geothermal capacity, sewage heat (locked until Profile C).
   - **Thermal Networks** — Network demand-duration curve and per-pipe metrics (locked until Profile D).
   - Tab buttons show a lock icon when the required simulation profile has not been run; clicking a locked tab does nothing.
-- `secap.tsx` — SECAP Workspace (placeholder).
+- `secap.tsx` — SECAP Workspace. Thin entry point: `<SecapLayout />` wrapped in `SecapProvider` (provider lives in `App.tsx` so the left dock dock section always has context).
 
 #### Components (`components/`)
 
-- `LeftDock.tsx` — Left sidebar tab bar. Reads all scenario state from `ScenarioContext` (4 props only: `sidebarHidden`, `activePage`, `onNavigate`, `hasSelection`). Houses: simulation profile selector (A–E dropdown), scenario name input, save button with live save-duration display, scenario chips with status dots, run-simulation button, and a live simulation log panel with per-step HH:MM:SS elapsed timers. Clicking a chip loads the full saved state and navigates to Building Workspace. Profile labels: A — Demand Forecast, B — Lifecycle Assessment, C — Renewable Potentials, D — District Network, E — Full Assessment.
+- `LeftDock.tsx` — Left sidebar tab bar. Reads all scenario state from `ScenarioContext` (4 props only: `sidebarHidden`, `activePage`, `onNavigate`, `hasSelection`). Houses: simulation profile selector (A–E dropdown), scenario name input, save button with live save-duration display, scenario chips with status dots, run-simulation button, a live simulation log panel with per-step HH:MM:SS elapsed timers, and `SecapDockSection`. Clicking a chip loads the full saved state and navigates to Building Workspace. Profile labels: A — Demand Forecast, B — Lifecycle Assessment, C — Renewable Potentials, D — District Network, E — Full Assessment.
 - `ChartCard.tsx` — Reusable chart card wrapper. Props: `title`, `subtitle?`, `height?`, `locked?`, `lockMessage?`, `wide?`. When `locked=true` renders a padlock SVG overlay at the chart height instead of children. Used by all KPI tab components.
 - `ChatPanel.tsx` — Self-contained floating chat panel. Owns all chat state and Ollama model state. No chat state in parent components.
 - `SelectionPanel.tsx` — Bottom-centre panel with selected buildings, confirm/reset actions, and building cards.
@@ -73,6 +76,16 @@ All pages are lazy-loaded and persistently mounted.
 - `components/common/`
   - `LabeledSelectField.tsx` — Reusable labelled select control.
   - `LeftDockTab.tsx` — Reusable accordion tab wrapper for the left dock.
+- `components/secap/` — SECAP workspace components:
+  - `SecapLayout.tsx` — 7-panel CSS grid: 3×2 chapter editors (rows 1–2), horizontal drag-resize separators, full-text preview spanning all 3 columns (row 3). Sizes stored as CSS custom properties mutated by `useChapterResize`.
+  - `SecapChapterPanel.tsx` — Per-chapter panel. CodeMirror 6 editor with `@codemirror/lang-markdown` and `oneDark` theme. Header controls: chapter title, dirty indicator, lock count, status badge, Lock/Generate/Stop/Save buttons. Debounces `onChange` → `setChapterContent` at 400ms so only the active panel re-renders during typing; streaming bypasses the debounce. Lock button creates a locked range from the current editor selection (no-op if nothing selected).
+  - `SecapFullTextPanel.tsx` — Read-only `react-markdown` + `remark-gfm` preview of all 6 chapters concatenated. Dark-theme table, blockquote, heading, and code styles.
+  - `SecapDockSection.tsx` — Left dock panel: chapter rows with model selector dropdowns, status badges, and context meters; orchestrator notification panel showing which chapters are affected after a save.
+  - `SecapCommentPopover.tsx` — Floating popover that appears on text selection inside an editor wrap. Accepts a comment and calls `postComment(chapterId, selectedText, comment)` which opens a POST SSE stream for a targeted revision.
+  - `SecapStatusBadge.tsx` — Maps `ChapterStatus → color token + label`. States: `idle` (muted), `working` (running/pulse), `reading` (info), `blocked` (error), `waiting` (warning).
+  - `SecapContextMeter.tsx` — Progress bar for context window token usage (`contextTokensUsed / contextTokensMax`).
+  - `SecapToast.tsx` — Timed warning toast displayed when the user attempts to edit a locked line range.
+  - `lockedRangesExtension.ts` — CodeMirror 6 extension bundle: `lockedRangesField` (StateField holding `LockedLineRange[]`), `lockedRangesDecorations` (ViewPlugin applying `Decoration.line({class: 'cm-locked-line'})` to locked lines), `lockedRangesFilter` (EditorView.updateListener that calls `onBlocked()` when a change overlaps a locked range). Ranges are pushed in via `setLockedRangesEffect` (StateEffect).
 
 #### Services & Utilities
 
@@ -99,6 +112,7 @@ Token-driven CSS design system — all colors, spacing, radii, and transitions l
 | `common.css` | Shared button/input base classes, status indicators, utility classes |
 | `techtree.css` | Tech Tree ReactFlow canvas, layer bands, node pills |
 | `kpi.css` | KPI page layout, tab bar, chart-card grid, locked state overlay |
+| `secap.css` | SECAP layout grid, chapter panel headers, CodeMirror sizing, full-text markdown styles, status badge pulse animation, context meter, dock section, comment popover, toast, locked-line highlight (`.cm-locked-line`) |
 
 The app has two visual zones with distinct aesthetics:
 
@@ -125,6 +139,12 @@ Button tokens (`--btn-dark-*`, `--btn-light-*`, `--btn-primary-*`, `--btn-succes
 | `GET` | `/api/run-simulation` | SSE stream: runs the CEA pipeline for a named scenario. Accepts `?profile=demand\|lifecycle\|renewables\|network\|full` (default `demand`). |
 | `GET` | `/api/kpi-data/{name}` | Returns aggregated KPI data from CEA output CSVs: `annual` (per-building totals), `monthly` (12-month demand), `monthly_balance` (thermal gains/losses), `load_duration` (sorted hourly curves), `hourly_sample` (every 6th hour), `solar_radiation` (by surface orientation), `emissions`, `costs`, `potentials`, `network`. Each key is `null` if the required output file doesn't exist; `available[]` lists which data groups are present. |
 | `GET` | `/api/techtree-graph` | Returns the CEA technology graph with per-building linkage: each node carries `buildings[]` (list of building names that use it). Accepts `?scenario_name=&region=DE`. |
+| `GET` | `/api/secap/chapters/{scenario}` | Load all 6 chapter `.md` files + metadata. Returns template defaults if the `secap/` folder does not yet exist. Response: `{ chapters: { "1": { content, model, status, lockedRanges, timestamp }, … } }`. |
+| `POST` | `/api/secap/chapters/{scenario}/{id}` | Save one chapter. Body: `{ content, locked_ranges, user_saved }`. Atomic write via temp-file swap. Updates `metadata.json`. |
+| `GET` | `/api/secap/generate/{scenario}/{id}` | SSE stream. Assembles system prompt (general guidelines + chapter instructions + scenario KPI data + sibling summaries + current draft), then streams Ollama tokens as `data: { token, done }`. Accepts `?model=` override. Guarded by `threading.Semaphore(2)` to prevent GPU contention. |
+| `POST` | `/api/secap/comment/{scenario}/{id}` | SSE stream. Body: `{ selected_text, comment }`. Streams a targeted LLM revision of the selected passage only. Uses the chapter's saved model from `metadata.json`. |
+| `GET` | `/api/secap/full-text/{scenario}` | Concatenates all 6 saved chapter `.md` files with `---` separators. |
+| `POST` | `/api/secap/orchestrate/{scenario}` | Body: `{ trigger_type, source_id, user_saved }`. Looks up `CHAPTER_DEPENDENCIES` and returns `{ affected: [id, …], reason, trigger_type, source_id }`. Only fires when `user_saved: true`. Phase 2 stub: `DATA_SOURCE_DEPENDENCIES` dict is pre-wired for CEA/climate/GIS/finance data-source agents. |
 
 ---
 
@@ -288,3 +308,8 @@ Frontend (`frontend/.env` if needed):
 - KPI charts use `echarts-for-react` + ECharts 6. Always set a fixed `height` style on `ReactECharts` — the container must have a non-zero height or ECharts renders blank. Use `removeZeroSeries()` before passing `series` to avoid rendering ghost legend entries for unused energy carriers.
 - The `ScenarioContext` exposes `simProfile` / `setSimProfile` for profile selection and `saveStatus` / `saveStartedAt` / `saveDuration` for save-feedback UX. `LeftDock` reads these directly — no prop drilling needed.
 - `alert()` on successful save has been removed; the save button now shows a live HH:MM:SS counter while saving and switches to a "Saved" state on completion.
+- **SECAP editor lag**: `SecapChapterPanel` debounces `setChapterContent` at 400ms so only the active editor triggers a context re-render during typing. CodeMirror owns its own internal doc state so the editor is always instant. During streaming (`isGenerating`), the debounce is bypassed and tokens write directly to context.
+- **SECAP save with debounce**: `saveChapter(id, contentOverride?)` accepts an optional content override. `handleSave` in `SecapChapterPanel` flushes the debounce timer and passes `latestContentRef.current` directly, bypassing the async state update that would otherwise read stale content.
+- **SECAP agent prompts**: `_build_chapter_system_prompt()` opens with an explicit role framing block enumerating what the model must NOT output (Purpose statements, Requirements sections, Rules sections). Every data section is labelled `(follow; do not reproduce)`. The user prompt uses `YOUR OUTPUT MUST` / `YOUR OUTPUT MUST NOT` checklists. Without this framing, smaller models (llama3.1:8b) copy instruction text verbatim into the document.
+- **SECAP backend SSE**: the generate endpoint uses a sync `requests.post(stream=True)` generator wrapped in `StreamingResponse` — `httpx`/`aiohttp` are not available in the venv. Concurrent chapter generation is limited to 2 simultaneous Ollama requests via `threading.Semaphore(2)`.
+- **SECAP orchestration**: `POST /api/secap/orchestrate` only fires when `user_saved: True`. Agent auto-saves (e.g. intermediate streaming writes) must send `user_saved: False` to avoid cascading notifications on every token. The static `CHAPTER_DEPENDENCIES` dict is the Phase 1 graph; `DATA_SOURCE_DEPENDENCIES` is pre-stubbed for Phase 2 data-source agent integration.

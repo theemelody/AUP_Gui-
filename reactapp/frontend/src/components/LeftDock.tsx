@@ -3,6 +3,7 @@ import LeftDockTab from './common/LeftDockTab.jsx';
 import { useScenarioContext } from '../context/ScenarioContext';
 import type { SimProfile } from '../context/ScenarioContext';
 import type { PageId } from '../states/navigationMachine';
+import SecapDockSection from './secap/SecapDockSection.js';
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -277,7 +278,7 @@ function LeftDock({ sidebarHidden, activePage, onNavigate, hasSelection }: LeftD
           active={activePage === 'secap'}
           onActivate={() => onNavigate('secap')}
         >
-          <div className="left-dock-empty-panel">SECAP controls will appear here.</div>
+          <SecapDockSection />
         </LeftDockTab>
 
       </div>

@@ -30,3 +30,6 @@
 
 /* KPI workspace */
 @import "./styles/kpi.css";
+
+/* SECAP workspace */
+@import "./styles/secap.css";

@@ -244,3 +244,101 @@ export async function fetchKpiData(scenarioName: string): Promise<KpiData> {
     'KPI data request',
   );
 }
+
+// ─── SECAP ────────────────────────────────────────────────────────────────────
+
+export interface SecapChapterData {
+  id: number;
+  content: string;
+  model: string;
+  status: string;
+  lockedRanges: Array<{ startLine: number; endLine: number }>;
+  timestamp: string | null;
+}
+
+export interface SecapChaptersResponse {
+  chapters: Record<string, SecapChapterData>;
+}
+
+export interface OrchestrateResponse {
+  affected: number[];
+  reason: string;
+  trigger_type: string;
+  source_id: string;
+}
+
+export async function fetchSecapChapters(scenarioName: string): Promise<SecapChaptersResponse> {
+  return fetchJson<SecapChaptersResponse>(
+    `${API_BASE}/secap/chapters/${encodeURIComponent(scenarioName)}`,
+    undefined,
+    'SECAP chapters load',
+  );
+}
+
+export async function saveSecapChapter(
+  scenarioName: string,
+  chapterId: number,
+  content: string,
+  lockedRanges: Array<{ startLine: number; endLine: number }>,
+  userSaved: boolean,
+): Promise<{ ok: boolean; chapter_id: number; timestamp: string }> {
+  return fetchJson(
+    `${API_BASE}/secap/chapters/${encodeURIComponent(scenarioName)}/${chapterId}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, locked_ranges: lockedRanges, user_saved: userSaved }),
+    },
+    'SECAP chapter save',
+  );
+}
+
+export async function fetchSecapFullText(scenarioName: string): Promise<{ text: string }> {
+  return fetchJson<{ text: string }>(
+    `${API_BASE}/secap/full-text/${encodeURIComponent(scenarioName)}`,
+    undefined,
+    'SECAP full text',
+  );
+}
+
+export async function orchestrateSecap(
+  scenarioName: string,
+  triggerType: 'chapter_saved' | 'data_source_updated',
+  sourceId: string,
+  userSaved = true,
+): Promise<OrchestrateResponse> {
+  return fetchJson<OrchestrateResponse>(
+    `${API_BASE}/secap/orchestrate/${encodeURIComponent(scenarioName)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger_type: triggerType, source_id: sourceId, user_saved: userSaved }),
+    },
+    'SECAP orchestrate',
+  );
+}
+
+export function openSecapGenerateStream(scenarioName: string, chapterId: number, model: string): EventSource {
+  const params = new URLSearchParams({ model });
+  return new EventSource(
+    `${API_BASE}/secap/generate/${encodeURIComponent(scenarioName)}/${chapterId}?${params}`,
+  );
+}
+
+export async function postSecapComment(
+  scenarioName: string,
+  chapterId: number,
+  selectedText: string,
+  comment: string,
+): Promise<Response> {
+  const resp = await fetch(
+    `${API_BASE}/secap/comment/${encodeURIComponent(scenarioName)}/${chapterId}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selected_text: selectedText, comment }),
+    },
+  );
+  if (!resp.ok) throw new Error(`SECAP comment failed (${resp.status})`);
+  return resp;
+}

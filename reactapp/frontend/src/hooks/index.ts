@@ -4,3 +4,5 @@ export { useMapboxDraw } from './useMapboxDraw';
 export { useMapboxFit } from './useMapboxFit';
 export { useBuildingSelection } from './useBuildingSelection';
 export { useNavigation } from './useNavigation';
+export { useChapterResize } from './useChapterResize';
+export { useTextSelection } from './useTextSelection';

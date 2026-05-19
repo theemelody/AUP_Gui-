@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import LeftDock from './components/LeftDock.jsx';
 import { useNavigation } from './hooks/useNavigation';
 import { ScenarioProvider, useScenarioContext } from './context/ScenarioContext';
+import { SecapProvider } from './context/SecapContext';
 import type { ActiveSelectionInfo } from './pages/buildingSelection';
 import type { PageId } from './states/navigationMachine';
 
@@ -109,12 +110,14 @@ function App() {
       getActiveSelection={() => activeSelectionRef.current}
       getDrawnPolygon={() => drawnPolygonRef.current}
     >
-      <AppContent
-        activePage={activePage}
-        navigate={navigate as (page: PageId) => void}
-        activeSelectionRef={activeSelectionRef}
-        drawnPolygonRef={drawnPolygonRef}
-      />
+      <SecapProvider>
+        <AppContent
+          activePage={activePage}
+          navigate={navigate as (page: PageId) => void}
+          activeSelectionRef={activeSelectionRef}
+          drawnPolygonRef={drawnPolygonRef}
+        />
+      </SecapProvider>
     </ScenarioProvider>
   );
 }

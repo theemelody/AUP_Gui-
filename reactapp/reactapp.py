@@ -5,6 +5,8 @@ import datetime
 import zipfile
 import tempfile
 import os
+import re
+import threading
 import base64
 import requests
 import pandas as pd
@@ -1733,5 +1735,380 @@ def get_kpi_data(scenario_name: str):
             break
 
     return result
+
+
+# ─── SECAP ────────────────────────────────────────────────────────────────────
+
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+SECAP_CONTEXTS_DIR = os.path.join(DATA_DIR, "secap_agent_contexts")
+
+_ollama_semaphore = threading.Semaphore(2)
+
+_CHAPTER_CONTEXT_NAMES: dict[int, str] = {
+    1: "chapter_1_executive_summary",
+    2: "chapter_2_strategy",
+    3: "chapter_3_bei",
+    4: "chapter_4_rva",
+    5: "chapter_5_mitigation",
+    6: "chapter_6_adaptation",
+}
+
+_CHAPTER_TITLES: dict[int, str] = {
+    1: "Executive Summary",
+    2: "Strategy",
+    3: "Baseline Emission Inventory (BEI)",
+    4: "Climate Change Risk & Vulnerability Assessment",
+    5: "Mitigation Actions and Measures",
+    6: "Adaptation Actions and Measures",
+}
+
+# Static chapter-to-chapter dependency graph (which chapters must be revisited when another is saved)
+CHAPTER_DEPENDENCIES: dict[int, list[int]] = {
+    3: [1, 5, 6],  # BEI → Executive Summary, Mitigation, Adaptation
+    4: [5, 6],      # RVA → Mitigation, Adaptation
+    2: [1],         # Strategy → Executive Summary
+    5: [1],         # Mitigation → Executive Summary
+    6: [1],         # Adaptation → Executive Summary
+}
+
+# Phase 2 stub — data source agents will populate this
+DATA_SOURCE_DEPENDENCIES: dict[str, list[int]] = {
+    # "cea_outputs":  [3, 5],
+    # "climate_data": [4],
+    # "gis_data":     [4],
+    # "policy_docs":  [2, 6],
+}
+
+
+class SecapSaveRequest(BaseModel):
+    content: str
+    locked_ranges: list[dict] = []
+    user_saved: bool = True
+
+
+class SecapCommentRequest(BaseModel):
+    selected_text: str
+    comment: str
+
+
+class OrchestrateRequest(BaseModel):
+    trigger_type: str = "chapter_saved"  # "chapter_saved" | "data_source_updated"
+    source_id: str                        # chapter number as str ("3") or data source key
+    user_saved: bool = True
+
+
+# ─── SECAP helpers ────────────────────────────────────────────────────────────
+
+def _get_secap_dir(scenario_name: str) -> str:
+    secap_dir = os.path.join(SCENARIOS_DIR, f"{scenario_name}-scenario", "secap")
+    os.makedirs(secap_dir, exist_ok=True)
+    return secap_dir
+
+
+def _load_secap_metadata(scenario_name: str) -> dict:
+    meta_path = os.path.join(_get_secap_dir(scenario_name), "metadata.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {
+        "models":      {str(i): OLLAMA_MODEL for i in range(1, 7)},
+        "statuses":    {str(i): "idle"        for i in range(1, 7)},
+        "lockedRanges":{str(i): []            for i in range(1, 7)},
+        "timestamps":  {str(i): None          for i in range(1, 7)},
+    }
+
+
+def _save_secap_metadata(scenario_name: str, metadata: dict) -> None:
+    meta_path = os.path.join(_get_secap_dir(scenario_name), "metadata.json")
+    tmp = meta_path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(metadata, f, indent=2)
+    os.replace(tmp, meta_path)
+
+
+def _parse_secap_template() -> dict[int, str]:
+    """Split SECAP_TEMPLATE.md by top-level numbered headings into 6 chapter strings."""
+    template_path = os.path.join(DATA_DIR, "SECAP_TEMPLATE.md")
+    if not os.path.exists(template_path):
+        return {i: f"# Chapter {i}: {_CHAPTER_TITLES[i]}\n\n[Content goes here.]\n" for i in range(1, 7)}
+    with open(template_path) as f:
+        text = f.read()
+    parts = re.split(r'\n(?=\d+\. )', text)
+    chapters: dict[int, str] = {}
+    for part in parts:
+        m = re.match(r'^(\d+)\. ', part)
+        if m:
+            num = int(m.group(1))
+            if 1 <= num <= 6:
+                chapters[num] = part.strip()
+    for i in range(1, 7):
+        if i not in chapters:
+            chapters[i] = f"# Chapter {i}: {_CHAPTER_TITLES[i]}\n\n[Content goes here.]\n"
+    return chapters
+
+
+def _build_chapter_system_prompt(chapter_id: int, scenario_name: str) -> str:
+    """Assemble the Ollama system prompt for a chapter agent (guidelines → chapter ctx → scenario data → siblings → draft)."""
+    parts: list[str] = []
+
+    # Role framing — must come first so the model doesn't treat instruction text as output
+    parts.append(
+        "=== YOUR ROLE ===\n"
+        "You are a professional SECAP (Sustainable Energy and Climate Action Plan) document writer for a municipality.\n"
+        "The sections below are WRITING INSTRUCTIONS for you to follow. They are NOT content to reproduce in your output.\n"
+        "CRITICAL: Do NOT copy, quote, or paraphrase these instructions in your output. Do NOT output:\n"
+        "  - 'General SECAP Writing Guidelines' or any subheading from it\n"
+        "  - 'Purpose' statements (e.g. 'You draft the ...')\n"
+        "  - 'Minimum Requirements for Approval' sections\n"
+        "  - 'Rules' sections\n"
+        "  - Any text that reads like instructions to yourself\n"
+        "Your entire output must be valid SECAP document text that could appear in a published municipal plan."
+    )
+
+    guidelines_path = os.path.join(SECAP_CONTEXTS_DIR, "_general_guidelines.md")
+    if os.path.exists(guidelines_path):
+        with open(guidelines_path) as f:
+            parts.append("=== GENERAL WRITING RULES (follow; do not reproduce) ===\n" + f.read().strip())
+
+    ctx_name = _CHAPTER_CONTEXT_NAMES.get(chapter_id, f"chapter_{chapter_id}")
+    ctx_path = os.path.join(SECAP_CONTEXTS_DIR, f"{ctx_name}.md")
+    if os.path.exists(ctx_path):
+        with open(ctx_path) as f:
+            parts.append("=== CHAPTER-SPECIFIC INSTRUCTIONS (follow; do not reproduce) ===\n" + f.read().strip())
+
+    scenario_path = os.path.join(SCENARIOS_DIR, f"{scenario_name}-scenario")
+    kpi_lines: list[str] = []
+    demand_csv = os.path.join(scenario_path, "outputs", "data", "demand", "Total_demand.csv")
+    if os.path.exists(demand_csv):
+        try:
+            df = pd.read_csv(demand_csv)
+            total_mwh = df.select_dtypes(include="number").sum().sum()
+            kpi_lines.append(f"- Total building energy demand: {total_mwh:.0f} MWh/yr (Total_demand.csv)")
+        except Exception:
+            pass
+    emissions_csv = os.path.join(
+        scenario_path, "outputs", "data", "analysis", "baseline", "emissions", "emissions_buildings.csv"
+    )
+    if os.path.exists(emissions_csv):
+        try:
+            df = pd.read_csv(emissions_csv)
+            if "operation_kgCO2e" in df.columns:
+                total_t = df["operation_kgCO2e"].sum() / 1000
+                kpi_lines.append(f"- Total operational GHG: {total_t:.1f} tCO₂e/yr (emissions_buildings.csv)")
+        except Exception:
+            pass
+    parts.append(
+        "=== SCENARIO DATA (reference only; use these figures in the document) ===\n"
+        + ("\n".join(kpi_lines) if kpi_lines
+        else f"Scenario: {scenario_name} — CEA simulation data not yet available. Use [DATA NEEDED: run CEA simulation] for any numeric KPIs.")
+    )
+
+    secap_dir = os.path.join(scenario_path, "secap")
+    sibling_summaries: list[str] = []
+    for sid in range(1, 7):
+        if sid == chapter_id:
+            continue
+        sib_path = os.path.join(secap_dir, f"chapter_{sid}.md")
+        if os.path.exists(sib_path):
+            with open(sib_path) as f:
+                words = f.read().split()
+            snippet = " ".join(words[:200]) + ("..." if len(words) > 200 else "")
+            sibling_summaries.append(f"Chapter {sid} ({_CHAPTER_TITLES[sid]}) [first 200 words]:\n{snippet}")
+    if sibling_summaries:
+        parts.append("=== SIBLING CHAPTERS (reference for cross-chapter consistency; do not copy verbatim) ===\n" + "\n\n".join(sibling_summaries))
+
+    current_path = os.path.join(secap_dir, f"chapter_{chapter_id}.md")
+    if os.path.exists(current_path):
+        with open(current_path) as f:
+            draft = f.read().strip()
+        if draft:
+            parts.append(f"=== EXISTING DRAFT (revise or continue this — output the improved version) ===\n{draft}")
+    else:
+        template_chapters = _parse_secap_template()
+        parts.append(f"=== TEMPLATE STRUCTURE (use as a guide for headings and layout only) ===\n{template_chapters.get(chapter_id, '')}")
+
+    return "\n\n".join(parts)
+
+
+def _ollama_generate_stream(model: str, system_prompt: str, user_prompt: str):
+    """Sync generator: streams SSE-formatted tokens from Ollama /api/generate."""
+    with _ollama_semaphore:
+        try:
+            payload = {"model": model, "system": system_prompt, "prompt": user_prompt, "stream": True}
+            with requests.post(
+                f"{OLLAMA_BASE_URL}/api/generate", json=payload, stream=True, timeout=300
+            ) as resp:
+                if resp.status_code != 200:
+                    yield f"data: {json.dumps({'error': f'Ollama returned {resp.status_code}'})}\n\n"
+                    return
+                for raw in resp.iter_lines():
+                    if raw:
+                        try:
+                            chunk = json.loads(raw)
+                            token = chunk.get("response", "")
+                            done = chunk.get("done", False)
+                            yield f"data: {json.dumps({'token': token, 'done': done})}\n\n"
+                            if done:
+                                break
+                        except json.JSONDecodeError:
+                            pass
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+
+# ─── SECAP endpoints ──────────────────────────────────────────────────────────
+
+@app.get("/api/secap/chapters/{scenario_name}")
+def secap_load_chapters(scenario_name: str):
+    """Load all 6 chapter .md files + metadata; returns template defaults if folder absent."""
+    secap_dir = _get_secap_dir(scenario_name)
+    metadata = _load_secap_metadata(scenario_name)
+    template_chapters = _parse_secap_template()
+    chapters: dict[str, dict] = {}
+    for i in range(1, 7):
+        chapter_path = os.path.join(secap_dir, f"chapter_{i}.md")
+        if os.path.exists(chapter_path):
+            with open(chapter_path) as f:
+                content = f.read()
+        else:
+            content = template_chapters.get(i, "")
+        chapters[str(i)] = {
+            "id": i,
+            "content": content,
+            "model": metadata["models"].get(str(i), OLLAMA_MODEL),
+            "status": metadata["statuses"].get(str(i), "idle"),
+            "lockedRanges": metadata["lockedRanges"].get(str(i), []),
+            "timestamp": metadata["timestamps"].get(str(i)),
+        }
+    return {"chapters": chapters}
+
+
+@app.post("/api/secap/chapters/{scenario_name}/{chapter_id}")
+def secap_save_chapter(scenario_name: str, chapter_id: int, req: SecapSaveRequest):
+    """Save one chapter to disk; updates metadata.json. Atomic write via temp-file swap."""
+    if chapter_id not in range(1, 7):
+        raise HTTPException(status_code=400, detail="chapter_id must be 1–6")
+    secap_dir = _get_secap_dir(scenario_name)
+    chapter_path = os.path.join(secap_dir, f"chapter_{chapter_id}.md")
+    tmp = chapter_path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(req.content)
+    os.replace(tmp, chapter_path)
+    metadata = _load_secap_metadata(scenario_name)
+    metadata["lockedRanges"][str(chapter_id)] = req.locked_ranges
+    metadata["timestamps"][str(chapter_id)] = datetime.datetime.utcnow().isoformat()
+    _save_secap_metadata(scenario_name, metadata)
+    return {"ok": True, "chapter_id": chapter_id, "timestamp": metadata["timestamps"][str(chapter_id)]}
+
+
+@app.get("/api/secap/generate/{scenario_name}/{chapter_id}")
+def secap_generate(scenario_name: str, chapter_id: int, model: str = ""):
+    """SSE: stream Ollama token-by-token generation for a chapter."""
+    if chapter_id not in range(1, 7):
+        raise HTTPException(status_code=400, detail="chapter_id must be 1–6")
+    used_model = model or OLLAMA_MODEL
+    system_prompt = _build_chapter_system_prompt(chapter_id, scenario_name)
+    title = _CHAPTER_TITLES[chapter_id]
+    user_prompt = (
+        f"Write Chapter {chapter_id} ({title}) of this municipality's SECAP.\n\n"
+        f"YOUR OUTPUT MUST:\n"
+        f"- Start with the heading: ## {chapter_id}. {title}\n"
+        f"- Contain ONLY publishable SECAP document content — prose, tables, and chart placeholders.\n"
+        f"- Use [DATA NEEDED: description] for any figures not available in the scenario data.\n"
+        f"- Include chart placeholders using exact syntax: [CHART: key — description]\n"
+        f"- Follow the section structure specified in your chapter instructions.\n\n"
+        f"YOUR OUTPUT MUST NOT contain:\n"
+        f"- The text 'General SECAP Writing Guidelines' or any subheading from it\n"
+        f"- Any 'Purpose', 'Minimum Requirements for Approval', or 'Rules' section headings\n"
+        f"- Instructions addressed to yourself (e.g. 'You draft...', 'Flag any...')\n"
+        f"- Fabricated emission figures, costs, or percentages not present in the scenario data\n\n"
+        f"Begin writing the chapter now."
+    )
+    return StreamingResponse(
+        _ollama_generate_stream(used_model, system_prompt, user_prompt),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/secap/comment/{scenario_name}/{chapter_id}")
+def secap_comment(scenario_name: str, chapter_id: int, req: SecapCommentRequest):
+    """SSE: stream a targeted LLM revision for a user-selected passage."""
+    if chapter_id not in range(1, 7):
+        raise HTTPException(status_code=400, detail="chapter_id must be 1–6")
+    system_prompt = _build_chapter_system_prompt(chapter_id, scenario_name)
+    user_prompt = (
+        f"The user has selected a passage from Chapter {chapter_id} ({_CHAPTER_TITLES[chapter_id]}) "
+        f"and added a revision comment.\n\n"
+        f"SELECTED TEXT:\n{req.selected_text}\n\n"
+        f"USER COMMENT:\n{req.comment}\n\n"
+        f"YOUR OUTPUT MUST:\n"
+        f"- Contain ONLY the revised version of the selected passage in valid Markdown.\n"
+        f"- Address the user's comment precisely.\n"
+        f"- Preserve the tone, person (third person), and formatting style of the original.\n\n"
+        f"YOUR OUTPUT MUST NOT:\n"
+        f"- Include any instruction-section text (Purpose, Rules, Requirements, Guidelines).\n"
+        f"- Rewrite or reference any part of the chapter outside the selected passage.\n"
+        f"- Include fabricated figures not in the scenario data.\n\n"
+        f"Output only the revised passage. Begin immediately with the replacement text."
+    )
+    metadata = _load_secap_metadata(scenario_name)
+    used_model = metadata["models"].get(str(chapter_id), OLLAMA_MODEL)
+    return StreamingResponse(
+        _ollama_generate_stream(used_model, system_prompt, user_prompt),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/secap/full-text/{scenario_name}")
+def secap_full_text(scenario_name: str):
+    """Return all 6 saved chapters concatenated as a single Markdown string."""
+    secap_dir = _get_secap_dir(scenario_name)
+    template_chapters = _parse_secap_template()
+    sections: list[str] = []
+    for i in range(1, 7):
+        chapter_path = os.path.join(secap_dir, f"chapter_{i}.md")
+        if os.path.exists(chapter_path):
+            with open(chapter_path) as f:
+                content = f.read().strip()
+        else:
+            content = template_chapters.get(i, "").strip()
+        sections.append(content)
+    return {"text": "\n\n---\n\n".join(sections)}
+
+
+@app.post("/api/secap/orchestrate/{scenario_name}")
+def secap_orchestrate(scenario_name: str, req: OrchestrateRequest):
+    """
+    Determine affected chapters after a save event.
+    Phase 1: static chapter-dependency graph (chapter_saved trigger).
+    Phase 2: DATA_SOURCE_DEPENDENCIES (data_source_updated trigger).
+    Only fires when req.user_saved is True — agent auto-saves are ignored.
+    """
+    if not req.user_saved:
+        return {"affected": [], "reason": "agent auto-save — orchestration skipped",
+                "trigger_type": req.trigger_type, "source_id": req.source_id}
+
+    if req.trigger_type == "chapter_saved":
+        try:
+            chapter_num = int(req.source_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="source_id must be a chapter number string")
+        affected = CHAPTER_DEPENDENCIES.get(chapter_num, [])
+        title = _CHAPTER_TITLES.get(chapter_num, f"Chapter {chapter_num}")
+        reason = f"{title} data changed" if affected else "no dependent chapters"
+    elif req.trigger_type == "data_source_updated":
+        affected = DATA_SOURCE_DEPENDENCIES.get(req.source_id, [])
+        reason = (f"Data source '{req.source_id}' updated" if affected
+                  else f"No chapters depend on '{req.source_id}'")
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown trigger_type: {req.trigger_type}")
+
+    return {"affected": affected, "reason": reason,
+            "trigger_type": req.trigger_type, "source_id": req.source_id}
 
 
